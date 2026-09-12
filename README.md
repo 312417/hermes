@@ -17,6 +17,14 @@ Telegram commands (enabled after configuring the token on the phone):
 - `/ask termos` to search the local knowledge base
 - `/tools` to list the explicit tools
 
+Plain text messages use the configured model provider and recent local memory.
+The default implementation supports the OpenAI Responses API through
+`HERMES_MODEL_PROVIDER=openai`, `OPENAI_MODEL` and `OPENAI_API_KEY`.
+
+On the phone, copy `telegram.env.example` to
+`/home/hermes/.config/hermes/telegram.env`, fill the Telegram token, pairing
+code and model key there, and restart Hermes. Never commit that file.
+
 The service binds to `127.0.0.1:8787` by default. It is intentionally not
 publicly exposed until authentication and a precise use case are defined.
 

@@ -11,6 +11,7 @@ import urllib.request
 from typing import Any
 
 from hermes_store import default_store
+from model_provider import ModelNotConfigured, provider_from_env
 from tool_registry import ToolRegistry
 
 
@@ -86,7 +87,19 @@ def handle_update(update: dict[str, Any], store: Any, registry: ToolRegistry) ->
         command, _, argument = text[1:].partition(" ")
         send_message(chat_id, registry.run(command, argument))
     else:
-        send_message(chat_id, "Use /help. Para me ensinar algo: /teach título | conteúdo")
+        store.add_memory(chat_id, "user", text)
+        try:
+            provider = provider_from_env()
+            if provider is None:
+                send_message(chat_id, "Modelo ainda não configurado. Use /teach título | conteúdo ou configure HERMES_MODEL_PROVIDER e OPENAI_API_KEY no celular.")
+                return
+            response = provider.respond(store.recent_memories(chat_id), store.search_knowledge(text))
+        except (ModelNotConfigured, RuntimeError) as error:
+            print(f"model error: {error}", flush=True)
+            send_message(chat_id, "Não consegui consultar o modelo agora; tente novamente.")
+            return
+        store.add_memory(chat_id, "assistant", response)
+        send_message(chat_id, response)
 
 
 def main() -> None:
