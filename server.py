@@ -6,32 +6,18 @@ from __future__ import annotations
 import json
 import os
 import time
-import uuid
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+
+from hermes_store import default_store
 
 
 HOST = os.environ.get("HERMES_HOST", "127.0.0.1")
 PORT = int(os.environ.get("HERMES_PORT", "8787"))
-DATA_DIR = Path(os.environ.get("HERMES_DATA_DIR", "./data"))
-TASKS_PATH = DATA_DIR / "tasks.json"
+STORE = default_store()
 STARTED_AT = datetime.now(timezone.utc).isoformat()
 START_MONOTONIC = time.monotonic()
-
-
-def load_tasks() -> list[dict]:
-    if not TASKS_PATH.exists():
-        return []
-    return json.loads(TASKS_PATH.read_text(encoding="utf-8"))
-
-
-def save_tasks(tasks: list[dict]) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    temporary = TASKS_PATH.with_suffix(".tmp")
-    temporary.write_text(json.dumps(tasks, indent=2), encoding="utf-8")
-    temporary.replace(TASKS_PATH)
 
 
 class HermesHandler(BaseHTTPRequestHandler):
@@ -58,11 +44,11 @@ class HermesHandler(BaseHTTPRequestHandler):
                     "service": "hermes",
                     "started_at": STARTED_AT,
                     "uptime_seconds": round(time.monotonic() - START_MONOTONIC, 2),
-                    "tasks": len(load_tasks()),
+                    "tasks": len(STORE.tasks()),
                 },
             )
         elif self.path == "/tasks":
-            self.reply(HTTPStatus.OK, {"tasks": load_tasks()})
+            self.reply(HTTPStatus.OK, {"tasks": STORE.tasks()})
         else:
             self.reply(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
@@ -80,20 +66,11 @@ class HermesHandler(BaseHTTPRequestHandler):
             self.reply(HTTPStatus.BAD_REQUEST, {"error": str(error)})
             return
 
-        tasks = load_tasks()
-        task = {
-            "id": str(uuid.uuid4()),
-            "title": title,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "state": "queued",
-        }
-        tasks.append(task)
-        save_tasks(tasks)
+        task = STORE.add_task(title)
         self.reply(HTTPStatus.CREATED, task)
 
 
 def main() -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer((HOST, PORT), HermesHandler)
     print(f"Hermes listening on http://{HOST}:{PORT}")
     server.serve_forever()

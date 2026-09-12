@@ -5,7 +5,7 @@ sshd
 
 while true; do
   proot-distro login ubuntu --user hermes -- bash -lc \
-    'cd /home/hermes/hermes-agent && exec python3 server.py' \
+    'cd /home/hermes/hermes-agent && exec python3 supervisor.py' \
     >> "$HOME/hermes.log" 2>&1
   sleep 5
 done

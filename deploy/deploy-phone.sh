@@ -8,15 +8,17 @@ PHONE_PORT="${PHONE_PORT:-8022}"
 REMOTE="${PHONE_USER}@${PHONE_HOST}"
 
 scp -P "$PHONE_PORT" -i "$PHONE_SSH_KEY" \
-  server.py README.md deploy/start-hermes "$REMOTE:"
+  server.py hermes_store.py tool_registry.py telegram_bot.py supervisor.py \
+  README.md telegram.env.example deploy/start-hermes "$REMOTE:"
 
 ssh -p "$PHONE_PORT" -i "$PHONE_SSH_KEY" "$REMOTE" \
   'mkdir -p ~/.termux/boot; install -m 700 start-hermes ~/.termux/boot/20-hermes; \
    proot-distro login ubuntu --bind /data/data/com.termux/files/home:/mnt/termux-home \
    -- bash -lc "install -d -o hermes -g hermes /home/hermes/hermes-agent; \
-   install -o hermes -g hermes -m 0644 /mnt/termux-home/server.py /home/hermes/hermes-agent/server.py; \
-   install -o hermes -g hermes -m 0644 /mnt/termux-home/README.md /home/hermes/hermes-agent/README.md; \
-   pkill -f \"^python3 server.py$\" || true"; \
+   for file in server.py hermes_store.py tool_registry.py telegram_bot.py supervisor.py README.md telegram.env.example; do \
+     install -o hermes -g hermes -m 0644 /mnt/termux-home/\$file /home/hermes/hermes-agent/\$file; \
+   done; \
+   pkill -f \"python3 (server.py|telegram_bot.py|supervisor.py)\" || true"; \
    nohup ~/.termux/boot/20-hermes >/dev/null 2>&1 &'
 
 echo "Hermes deployed to $REMOTE:$PHONE_PORT"
