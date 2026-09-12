@@ -21,9 +21,10 @@ Plain text messages use the configured model provider and recent local memory.
 The default implementation supports the OpenAI Responses API through
 `HERMES_MODEL_PROVIDER=openai`, `OPENAI_MODEL` and `OPENAI_API_KEY`.
 
-On the phone, copy `telegram.env.example` to
-`/home/hermes/.config/hermes/telegram.env`, fill the Telegram token, pairing
-code and model key there, and restart Hermes. Never commit that file.
+On the phone, run `./configure-secrets.sh` from the Hermes directory. It asks
+for the Telegram token and model key without echoing the OpenAI key, writes
+`/home/hermes/.config/hermes/telegram.env` with mode 600, and prints a
+one-time pairing code. Never commit that file.
 
 The service binds to `127.0.0.1:8787` by default. It is intentionally not
 publicly exposed until authentication and a precise use case are defined.
