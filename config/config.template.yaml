@@ -1,25 +1,15 @@
-# Hermes Agent — Template de configuração oficial (Nous Research)
-# Copiar para ~/.hermes/config.yaml no celular.
-# Este arquivo NÃO contém valores reais — é seguro para o GitHub.
-#
-# Os segredos ficam em ~/.hermes/.env no celular (nunca no repo):
-#   TELEGRAM_BOT_TOKEN=...
-#   GEMINI_API_KEY=...
-
+# Hermes Agent — Configuration
 providers:
   gemini:
-    base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
     key_env: "GEMINI_API_KEY"
 
 model:
-  provider: "custom:gemini"
-  default: "models/gemini-3.1-flash-lite"
+  provider: "gemini"
+  default: "gemini-3.7-flash"
 
 fallback_model:
-  - provider: "custom:gemini"
-    model: "models/gemini-3-flash-preview"
-  - provider: "custom:gemini"
-    model: "models/gemini-flash-lite-latest"
+  - provider: "gemini"
+    model: "gemini-3.1-flash-lite"
 
 platform_toolsets:
   telegram: [web, file, skills, todo, messaging, terminal, code_execution, memory, session_search, cronjob, vision]
@@ -41,5 +31,3 @@ mcp_servers:
   playwright:
     command: "npx"
     args: ["-y", "@playwright/mcp@latest", "--browser", "chromium"]
-
-
