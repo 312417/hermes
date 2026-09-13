@@ -13,13 +13,14 @@ providers:
 
 model:
   provider: "custom:groq"
-  default: "openai/gpt-oss-120b"
+  default: "groq/compound"
 
 fallback_model:
   - provider: "custom:groq"
-    model: "openai/gpt-oss-20b"
-  - provider: "custom:groq"
-    model: "qwen/qwen3.8-27b"
+    model: "groq/compound-mini"
+
+platform_toolsets:
+  telegram: [web, file, skills, todo, messaging]
 
 telegram:
   dm_policy: "open"
