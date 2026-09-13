@@ -18,8 +18,9 @@
 | Tarefas / to-do | ✅ ativo | criar, listar, concluir |
 | Terminal | ❌ bloqueado | liberar apenas com isolamento |
 | Browser / web | ❌ bloqueado | liberar em fase posterior |
-| MCP (Notion, etc.) | ❌ bloqueado | liberar em fase posterior |
+| MCP (Notion) | ✅ ativo | Restrito à página Hermes (`3daa76d515e4809fb006eb407f5d58cd`) |
 | Escrita de arquivos | ❌ bloqueado | liberar em fase posterior |
+
 
 ## Modelo padrão
 
