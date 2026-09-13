@@ -32,16 +32,24 @@ class ToolRegistry:
 
     def task(self, argument: str) -> str:
         if not argument:
-            return "Uso: /task título da tarefa"
-        task = self.store.add_task(argument)
-        return f"Tarefa criada: {task['id']} — {task['title']}"
+            return "Uso: /task título | descrição opcional"
+        title, separator, description = argument.partition("|")
+        title = title.strip()
+        if not title:
+            return "O título da tarefa é obrigatório."
+        task = self.store.add_task(title, description if separator else "")
+        details = f"\nDescrição: {task['description']}" if task["description"] else ""
+        return f"Tarefa criada: {task['id']} — {task['title']}{details}"
 
     def tasks(self, _argument: str) -> str:
         tasks = self.store.tasks()
         if not tasks:
             return "Nenhuma tarefa cadastrada."
         return "\n".join(
-            f"• {task['id'][:8]} [{task['state']}] {task['title']}" for task in tasks[-20:]
+            f"• {task['id'][:8]} [{task['state']}] {task['title']}"
+            f" — {task['description']}" if task.get("description") else
+            f"• {task['id'][:8]} [{task['state']}] {task['title']}"
+            for task in tasks[-20:]
         )
 
     def teach(self, argument: str) -> str:

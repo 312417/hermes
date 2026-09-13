@@ -8,20 +8,20 @@ umask 077
 
 printf 'Token do bot criado no @BotFather: '
 read -r telegram_token
-printf 'Chave da API OpenAI: '
-read -r -s openai_key
-printf '\nModelo OpenAI [gpt-5.6-luna]: '
-read -r openai_model
-openai_model="${openai_model:-gpt-5.6-luna}"
+printf 'Chave da API Groq: '
+read -r -s groq_key
 pairing_code="$(python3 -c 'import secrets; print(secrets.token_urlsafe(24))')"
 
 {
   printf 'TELEGRAM_BOT_TOKEN=%s\n' "$telegram_token"
   printf 'TELEGRAM_PAIRING_CODE=%s\n' "$pairing_code"
   printf 'TELEGRAM_ALLOWED_CHAT_IDS=\n'
-  printf 'HERMES_MODEL_PROVIDER=openai\n'
-  printf 'OPENAI_MODEL=%s\n' "$openai_model"
-  printf 'OPENAI_API_KEY=%s\n' "$openai_key"
+  printf 'HERMES_MODEL_PROVIDER=groq\n'
+  printf 'GROQ_API_KEY=%s\n' "$groq_key"
+  printf 'HERMES_FAST_MODEL=openai/gpt-oss-20b\n'
+  printf 'HERMES_TEXT_MODEL=llama-3.3-70b-versatile\n'
+  printf 'HERMES_THINK_MODEL=openai/gpt-oss-120b\n'
+  printf 'HERMES_RESEARCH_MODEL=groq/compound\n'
 } > "$config_file"
 chmod 600 "$config_file"
 

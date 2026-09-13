@@ -12,17 +12,21 @@ Endpoints:
 
 Telegram commands (enabled after configuring the token on the phone):
 
-- `/status`, `/task título`, `/tasks`
+- `/status`, `/task título | descrição opcional`, `/tasks`
 - `/teach título | conteúdo` to add knowledge
 - `/ask termos` to search the local knowledge base
 - `/tools` to list the explicit tools
 
 Plain text messages use the configured model provider and recent local memory.
-The default implementation supports the OpenAI Responses API through
-`HERMES_MODEL_PROVIDER=openai`, `OPENAI_MODEL` and `OPENAI_API_KEY`.
+The default deployment uses Groq's OpenAI-compatible Chat Completions API.
+Its local router selects `openai/gpt-oss-20b` for fast replies,
+`llama-3.3-70b-versatile` for writing, `openai/gpt-oss-120b` with high
+reasoning for planning/tasks, and `groq/compound` for explicit current-web
+research. Prefix a message with `#fast`, `#text`, `#think`, or `#research`
+to choose it directly.
 
 On the phone, run `./configure-secrets.sh` from the Hermes directory. It asks
-for the Telegram token and model key without echoing the OpenAI key, writes
+for the Telegram token and Groq model key without echoing it, writes
 `/home/hermes/.config/hermes/telegram.env` with mode 600, and prints a
 one-time pairing code. Never commit that file.
 

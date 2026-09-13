@@ -38,6 +38,7 @@ class HermesStore:
                 CREATE TABLE IF NOT EXISTS tasks (
                     id TEXT PRIMARY KEY,
                     title TEXT NOT NULL,
+                    description TEXT NOT NULL DEFAULT '',
                     created_at TEXT NOT NULL,
                     state TEXT NOT NULL
                 );
@@ -63,6 +64,9 @@ class HermesStore:
                 );
                 """
             )
+            task_columns = {row[1] for row in connection.execute("PRAGMA table_info(tasks)")}
+            if "description" not in task_columns:
+                connection.execute("ALTER TABLE tasks ADD COLUMN description TEXT NOT NULL DEFAULT ''")
             self._migrate_json_if_needed(connection)
         try:
             self.db_path.chmod(0o600)
@@ -95,16 +99,22 @@ class HermesStore:
     def tasks(self) -> list[dict]:
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT id, title, created_at, state FROM tasks ORDER BY rowid"
+                "SELECT id, title, description, created_at, state FROM tasks ORDER BY rowid"
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def add_task(self, title: str) -> dict:
-        task = {"id": str(uuid.uuid4()), "title": title.strip(), "created_at": utc_now(), "state": "queued"}
+    def add_task(self, title: str, description: str = "") -> dict:
+        task = {
+            "id": str(uuid.uuid4()),
+            "title": title.strip(),
+            "description": description.strip(),
+            "created_at": utc_now(),
+            "state": "queued",
+        }
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO tasks (id, title, created_at, state) VALUES (?, ?, ?, ?)",
-                (task["id"], task["title"], task["created_at"], task["state"]),
+                "INSERT INTO tasks (id, title, description, created_at, state) VALUES (?, ?, ?, ?, ?)",
+                (task["id"], task["title"], task["description"], task["created_at"], task["state"]),
             )
         return task
 

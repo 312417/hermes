@@ -91,9 +91,11 @@ def handle_update(update: dict[str, Any], store: Any, registry: ToolRegistry) ->
         try:
             provider = provider_from_env()
             if provider is None:
-                send_message(chat_id, "Modelo ainda não configurado. Use /teach título | conteúdo ou configure HERMES_MODEL_PROVIDER e OPENAI_API_KEY no celular.")
+                send_message(chat_id, "Modelo ainda não configurado. Use /teach título | conteúdo ou configure o provedor e a chave de API no celular.")
                 return
-            response = provider.respond(store.recent_memories(chat_id), store.search_knowledge(text))
+            response = provider.respond(
+                store.recent_memories(chat_id), store.search_knowledge(text), prompt=text
+            )
         except (ModelNotConfigured, RuntimeError) as error:
             print(f"model error: {error}", flush=True)
             send_message(chat_id, "Não consegui consultar o modelo agora; tente novamente.")

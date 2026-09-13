@@ -60,13 +60,14 @@ class HermesHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             request = json.loads(self.rfile.read(length).decode("utf-8"))
             title = str(request["title"]).strip()
+            description = str(request.get("description", "")).strip()
             if not title:
                 raise ValueError("title cannot be empty")
         except (KeyError, ValueError, json.JSONDecodeError) as error:
             self.reply(HTTPStatus.BAD_REQUEST, {"error": str(error)})
             return
 
-        task = STORE.add_task(title)
+        task = STORE.add_task(title, description)
         self.reply(HTTPStatus.CREATED, task)
 
 
