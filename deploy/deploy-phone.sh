@@ -50,18 +50,36 @@ if [ -d skills ]; then
 fi
 
 echo "==> Atualizando segredos no celular"
-GEMINI_API_KEY="${GEMINI_API_KEY:-AQ.Ab8RN6L9TOtl9YN4UHP791q57R1h9MJlRYnTVBGnj27cpc7yJQ}"
+GEMINI_API_KEY="${GEMINI_API_KEY:-}"
+NOTION_TOKEN="${NOTION_TOKEN:-}"
+OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
 ssh "${SSH_OPTS[@]}" "$REMOTE" "
-  # Atualiza ou adiciona GEMINI_API_KEY no .env
-  if grep -q '^GEMINI_API_KEY=' ~/.hermes/.env 2>/dev/null; then
-    sed -i 's|^GEMINI_API_KEY=.*|GEMINI_API_KEY=${GEMINI_API_KEY}|' ~/.hermes/.env
-  else
-    echo 'GEMINI_API_KEY=${GEMINI_API_KEY}' >> ~/.hermes/.env
+  if [ -n \"${GEMINI_API_KEY}\" ]; then
+    if grep -q '^GEMINI_API_KEY=' ~/.hermes/.env 2>/dev/null; then
+      sed -i 's|^GEMINI_API_KEY=.*|GEMINI_API_KEY=${GEMINI_API_KEY}|' ~/.hermes/.env
+    else
+      echo 'GEMINI_API_KEY=${GEMINI_API_KEY}' >> ~/.hermes/.env
+    fi
   fi
-  # Remove GROQ_API_KEY obsoleto se existir
+  if [ -n \"${NOTION_TOKEN}\" ]; then
+    for var in NOTION_TOKEN NOTION_API_KEY NOTION_API_TOKEN; do
+      if grep -q \"^\${var}=\" ~/.hermes/.env 2>/dev/null; then
+        sed -i \"s|^\${var}=.*|\${var}=\${NOTION_TOKEN}|\" ~/.hermes/.env
+      else
+        echo \"\${var}=\${NOTION_TOKEN}\" >> ~/.hermes/.env
+      fi
+    done
+  fi
+  if [ -n \"${OPENROUTER_API_KEY}\" ]; then
+    if grep -q '^OPENROUTER_API_KEY=' ~/.hermes/.env 2>/dev/null; then
+      sed -i 's|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=${OPENROUTER_API_KEY}|' ~/.hermes/.env
+    else
+      echo 'OPENROUTER_API_KEY=${OPENROUTER_API_KEY}' >> ~/.hermes/.env
+    fi
+  fi
   sed -i '/^GROQ_API_KEY=/d' ~/.hermes/.env || true
   chmod 600 ~/.hermes/.env
-  echo 'Segredos atualizados.'
+  echo 'Segredos sincronizados.'
 "
 
 ssh "${SSH_OPTS[@]}" "$REMOTE" 'env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD bash -c "

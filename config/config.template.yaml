@@ -4,6 +4,8 @@
 providers:
   gemini:
     key_env: "GEMINI_API_KEY"
+  openrouter:
+    key_env: "OPENROUTER_API_KEY"
 
 model:
   provider: "gemini"
@@ -14,6 +16,10 @@ model:
 fallback_model:
   - provider: "gemini"
     model: "gemini-3.1-flash-lite"
+  - provider: "openrouter"
+    model: "google/gemma-4-31b-it:free"
+  - provider: "opencode-free"
+    model: "deepseek-v4-flash-free"
 
 platform_toolsets:
   telegram: [web, file, skills, todo, messaging, terminal, code_execution, memory, session_search, cronjob, vision]
