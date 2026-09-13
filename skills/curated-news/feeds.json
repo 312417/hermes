@@ -1,0 +1,41 @@
+{
+  "gospel_br": [
+    {"name": "Gospel Prime", "url": "https://www.gospelprime.com.br/feed/"},
+    {"name": "Guiame", "url": "https://guiame.com.br/rss.xml"},
+    {"name": "Gospel Mais", "url": "https://noticias.gospelmais.com.br/feed"},
+    {"name": "CPAD News", "url": "https://www.cpadnews.com.br/rss.php"}
+  ],
+  "missoes_perseguida": [
+    {"name": "Portas Abertas Brasil", "url": "https://portasabertas.org.br/feed/"},
+    {"name": "Open Doors International", "url": "https://www.opendoors.org/en-US/newsroom/rss/"},
+    {"name": "International Christian Concern", "url": "https://www.persecution.org/feed/"},
+    {"name": "Voice of the Martyrs", "url": "https://www.persecution.com/feed/"}
+  ],
+  "gospel_intl": [
+    {"name": "Christianity Today", "url": "https://www.christianitytoday.com/feed/"},
+    {"name": "The Christian Post", "url": "https://www.christianpost.com/rss"}
+  ],
+  "futebol_br": [
+    {"name": "GE Globo", "url": "https://ge.globo.com/rss/ge/"},
+    {"name": "UOL Esporte", "url": "https://rss.uol.com.br/feed/esporte.xml"}
+  ],
+  "tecnologia": [
+    {"name": "TechCrunch", "url": "https://techcrunch.com/feed/"},
+    {"name": "The Verge", "url": "https://www.theverge.com/rss/index.xml"},
+    {"name": "Ars Technica", "url": "https://feeds.arstechnica.com/arstechnica/index"}
+  ],
+  "ia": [
+    {"name": "OpenAI News", "url": "https://openai.com/news/rss.xml"},
+    {"name": "Anthropic News", "url": "https://www.anthropic.com/news/rss.xml"}
+  ],
+  "mercado_financeiro_br": [
+    {"name": "InfoMoney", "url": "https://www.infomoney.com.br/feed/"},
+    {"name": "Valor Econômico", "url": "https://valor.globo.com/rss/financas/"}
+  ],
+  "mercado_financeiro_intl": [
+    {"name": "Reuters Business", "url": "https://www.reutersagency.com/feed/?taxonomy=markets&post_type=best"}
+  ],
+  "futebol_intl": [
+    {"name": "BBC Sport Football", "url": "https://feeds.bbci.co.uk/sport/football/rss.xml"}
+  ]
+}

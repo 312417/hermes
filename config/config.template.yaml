@@ -32,3 +32,14 @@ memory:
 
 timezone: "America/Sao_Paulo"
 
+mcp_servers:
+  newsapi:
+    command: "npx"
+    args: ["-y", "mcp-newsapi"]
+    env:
+      NEWSAPI_API_KEY: "${NEWSAPI_API_KEY}"
+  playwright:
+    command: "npx"
+    args: ["-y", "@playwright/mcp@latest", "--browser", "chromium"]
+
+
