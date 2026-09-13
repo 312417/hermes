@@ -26,11 +26,13 @@
   ],
   "ia": [
     {"name": "OpenAI News", "url": "https://openai.com/news/rss.xml"},
-    {"name": "Anthropic News", "url": "https://www.anthropic.com/news/rss.xml"}
+    {"name": "Anthropic News", "url": "https://www.anthropic.com/news/rss.xml"},
+    {"name": "Artificial Analysis", "url": "https://artificialanalysis.ai/models"}
   ],
   "mercado_financeiro_br": [
     {"name": "InfoMoney", "url": "https://www.infomoney.com.br/feed/"},
-    {"name": "Valor Econômico", "url": "https://valor.globo.com/rss/financas/"}
+    {"name": "Valor Econômico", "url": "https://valor.globo.com/rss/financas/"},
+    {"name": "B3 Notícias", "url": "https://www.b3.com.br/pt_br/noticias/"}
   ],
   "mercado_financeiro_intl": [
     {"name": "Reuters Business", "url": "https://www.reutersagency.com/feed/?taxonomy=markets&post_type=best"}

@@ -17,8 +17,8 @@ Esta skill permite coletar notícias atualizadas das fontes mais confiáveis map
 - `futebol_br`: Futebol nacional (GE Globo, UOL Esporte).
 - `futebol_intl`: Futebol internacional (BBC Sport).
 - `tecnologia`: Notícias de tecnologia (TechCrunch, The Verge, Ars Technica).
-- `ia`: Notícias oficiais de inteligência artificial (OpenAI, Anthropic).
-- `mercado_financeiro_br`: Economia e finanças brasileiras (InfoMoney, Valor Econômico).
+- `ia`: Notícias oficiais de inteligência artificial (OpenAI, Anthropic) e benchmarks/comparações de modelos via **Artificial Analysis** (`https://artificialanalysis.ai/models`).
+- `mercado_financeiro_br`: Economia, finanças e mercado de capitais brasileiro (InfoMoney, Valor Econômico e comunicados oficiais da **B3** `https://www.b3.com.br/pt_br/noticias/`).
 - `mercado_financeiro_intl`: Mercados e finanças globais (Reuters).
 
 ## Como executar:
