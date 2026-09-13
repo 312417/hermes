@@ -49,10 +49,27 @@ if [ -d skills ]; then
   scp -r "${SCP_OPTS[@]}" skills "$REMOTE:~/.hermes/" || true
 fi
 
-ssh "${SSH_OPTS[@]}" "$REMOTE" 'proot-distro login ubuntu -- bash -c "
+echo "==> Atualizando segredos no celular"
+GEMINI_API_KEY="${GEMINI_API_KEY:-AQ.Ab8RN6L9TOtl9YN4UHP791q57R1h9MJlRYnTVBGnj27cpc7yJQ}"
+ssh "${SSH_OPTS[@]}" "$REMOTE" "
+  # Atualiza ou adiciona GEMINI_API_KEY no .env
+  if grep -q '^GEMINI_API_KEY=' ~/.hermes/.env 2>/dev/null; then
+    sed -i 's|^GEMINI_API_KEY=.*|GEMINI_API_KEY=${GEMINI_API_KEY}|' ~/.hermes/.env
+  else
+    echo 'GEMINI_API_KEY=${GEMINI_API_KEY}' >> ~/.hermes/.env
+  fi
+  # Remove GROQ_API_KEY obsoleto se existir
+  sed -i '/^GROQ_API_KEY=/d' ~/.hermes/.env || true
+  chmod 600 ~/.hermes/.env
+  echo 'Segredos atualizados.'
+"
+
+ssh "${SSH_OPTS[@]}" "$REMOTE" 'env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD bash -c "
   cp -r /data/data/com.termux/files/home/.hermes/profile/* /root/.hermes/profile/
   cp /data/data/com.termux/files/home/.hermes/config.template.yaml /root/.hermes/config.template.yaml
-  [ -f /root/.hermes/config.yaml ] || cp /root/.hermes/config.template.yaml /root/.hermes/config.yaml
+  cp /root/.hermes/config.template.yaml /root/.hermes/config.yaml
+  # Sincronizar .env para o container ubuntu
+  cp /data/data/com.termux/files/home/.hermes/.env /root/.hermes/.env 2>/dev/null || true
 "'
 
 echo "==> Instalando script de boot"

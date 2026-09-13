@@ -4,20 +4,22 @@
 #
 # Os segredos ficam em ~/.hermes/.env no celular (nunca no repo):
 #   TELEGRAM_BOT_TOKEN=...
-#   GROQ_API_KEY=...
+#   GEMINI_API_KEY=...
 
 providers:
-  groq:
-    base_url: "https://api.groq.com/openai/v1"
-    key_env: "GROQ_API_KEY"
+  gemini:
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
+    key_env: "GEMINI_API_KEY"
 
 model:
-  provider: "custom:groq"
-  default: "groq/compound"
+  provider: "custom:gemini"
+  default: "models/gemini-3.6-flash"
 
 fallback_model:
-  - provider: "custom:groq"
-    model: "groq/compound-mini"
+  - provider: "custom:gemini"
+    model: "models/gemini-3.8-flash"
+  - provider: "custom:gemini"
+    model: "models/gemini-3.1-flash-lite"
 
 platform_toolsets:
   telegram: [web, file, skills, todo, messaging]

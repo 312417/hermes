@@ -8,11 +8,11 @@ pgrep -x sshd >/dev/null 2>&1 || sshd
 
 # Sincronizar segredos do Termux para o container Ubuntu se existirem
 if [ -f "$HOME/.hermes/.env" ]; then
-  proot-distro login ubuntu -- bash -c 'mkdir -p /root/.hermes && cp /data/data/com.termux/files/home/.hermes/.env /root/.hermes/.env && chmod 600 /root/.hermes/.env'
+  env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD bash -c 'mkdir -p /root/.hermes && cp /data/data/com.termux/files/home/.hermes/.env /root/.hermes/.env && chmod 600 /root/.hermes/.env'
 fi
 
 while true; do
-  proot-distro login ubuntu -- bash -lc \
+  env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD bash -lc \
     'export HERMES_TIMEZONE="America/Sao_Paulo"; [ -f /root/.hermes/.env ] && set -a && . /root/.hermes/.env && set +a; cd /root/hermes-agent && exec /usr/local/bin/hermes gateway run' \
     >> "$HOME/hermes-gateway.log" 2>&1
   echo "[$(date)] Hermes Gateway encerrou, reiniciando em 5s..." >> "$HOME/hermes-gateway.log"
