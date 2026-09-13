@@ -1,4 +1,6 @@
-# Hermes Agent — Configuration
+# Hermes Agent — Configuração
+# Otimizado para economia de tokens + alta performance
+
 providers:
   gemini:
     key_env: "GEMINI_API_KEY"
@@ -6,6 +8,8 @@ providers:
 model:
   provider: "gemini"
   default: "gemini-3.7-flash"
+  max_history: 10        # Janela deslizante: apenas as 10 últimas mensagens
+  max_tokens: 10000      # Limite máximo de tokens na resposta
 
 fallback_model:
   - provider: "gemini"
@@ -17,8 +21,17 @@ platform_toolsets:
 telegram:
   dm_policy: "open"
 
+# Memória semântica de longo prazo (persiste entre sessões, independente do histórico)
 memory:
   enabled: true
+
+# Curator: sumarização automática de contexto
+# Comprime turns antigos em um resumo conciso ao atingir o limite do histórico.
+# Descarta mensagens de erro e irrelevantes, preserva decisões e fatos importantes.
+curator:
+  enabled: true
+  # Modelo leve para sumarização (economiza tokens do modelo principal)
+  model: "gemini-3.1-flash-lite"
 
 timezone: "America/Sao_Paulo"
 
@@ -31,3 +44,4 @@ mcp_servers:
   playwright:
     command: "npx"
     args: ["-y", "@playwright/mcp@latest", "--browser", "chromium"]
+
