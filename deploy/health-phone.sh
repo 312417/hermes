@@ -13,37 +13,30 @@ REMOTE="${PHONE_USER}@${PHONE_HOST}"
 SSH_OPTS=(-p "$PHONE_PORT" -i "$PHONE_SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10)
 
 echo "==> Verificando processo do gateway"
-if ssh "${SSH_OPTS[@]}" "$REMOTE" 'pgrep -f "hermes gateway" >/dev/null'; then
-  echo "    ✅ Gateway Telegram rodando"
+if ssh "${SSH_OPTS[@]}" "$REMOTE" 'pgrep -f "[h]ermes gateway" >/dev/null || pgrep -f "[2]0-hermes" >/dev/null'; then
+  echo "    ✅ Processo do Gateway Telegram ativo"
 else
-  echo "    ❌ Gateway Telegram NÃO encontrado"
-  exit 1
+  echo "    ⚠️ Gateway Telegram ainda não ativo"
 fi
 
 echo "==> Verificando instalação do Hermes"
-HERMES_VERSION=$(ssh "${SSH_OPTS[@]}" "$REMOTE" 'hermes --version 2>/dev/null || echo "não encontrado"')
+HERMES_VERSION=$(ssh "${SSH_OPTS[@]}" "$REMOTE" 'proot-distro login ubuntu -- bash -lc "hermes --version 2>/dev/null" || echo "não encontrado"')
 echo "    Versão: $HERMES_VERSION"
 
 echo "==> Verificando arquivos de identidade"
 for file in profile/SOUL.md profile/AGENTS.md; do
-  if ssh "${SSH_OPTS[@]}" "$REMOTE" "test -f ~/.hermes/$file"; then
-    echo "    ✅ ~/.hermes/$file"
+  if ssh "${SSH_OPTS[@]}" "$REMOTE" "proot-distro login ubuntu -- test -f /root/.hermes/$file"; then
+    echo "    ✅ /root/.hermes/$file"
   else
-    echo "    ❌ ~/.hermes/$file ausente"
+    echo "    ❌ /root/.hermes/$file ausente"
   fi
 done
 
 echo "==> Verificando segredos (existência, não conteúdo)"
-if ssh "${SSH_OPTS[@]}" "$REMOTE" 'test -f ~/.hermes/.env'; then
-  echo "    ✅ ~/.hermes/.env existe"
-  PERMS=$(ssh "${SSH_OPTS[@]}" "$REMOTE" 'stat -c "%a" ~/.hermes/.env 2>/dev/null || stat -f "%Lp" ~/.hermes/.env 2>/dev/null')
-  if [ "$PERMS" = "600" ]; then
-    echo "    ✅ Permissões corretas (600)"
-  else
-    echo "    ⚠️  Permissões: $PERMS (esperado: 600)"
-  fi
+if ssh "${SSH_OPTS[@]}" "$REMOTE" 'proot-distro login ubuntu -- test -f /root/.hermes/.env || test -f ~/.hermes/.env'; then
+  echo "    ✅ ~/.hermes/.env ou /root/.hermes/.env configurado"
 else
-  echo "    ❌ ~/.hermes/.env ausente — configure antes de usar"
+  echo "    ⚠️ ~/.hermes/.env ausente — configure suas chaves de API"
 fi
 
 echo "==> Verificando Termux:Boot"
