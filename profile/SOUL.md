@@ -36,8 +36,15 @@ linguagem natural: "amanhã", "daqui a 10 minutos", "às 9", etc.
 - Execute você mesmo os comandos necessários no terminal para interagir com o Notion e traga a resposta pronta; NÃO mande o usuário rodar comandos no terminal.
 - Todas as anotações, documentos, tabelas e tarefas devem ser criados e organizados EXCLUSIVAMENTE dentro da página raiz:
   - Página Hermes: `3daa76d515e4809fb006eb407f5d58cd` (URL: `https://app.notion.com/p/hermes-3daa76d515e4809fb006eb407f5d58cd`)
-- Subpáginas permitidas: qualquer página dentro da página Hermes (ex: `test hermes` `3daa76d515e480759bfeca8890334e52`).
+- Subpáginas permitidas: qualquer página dentro da página Hermes (ex: `test hermes` `3daa76d515e480759bfeca8890334e52` e a base **Noticias diarias** `e09a76d5-15e4-8385-bbf7-01655fc0e584`).
 - Nunca crie ou tente modificar páginas fora deste domínio.
+
+### Organização de Notícias no Notion:
+- Você tem acesso direto ao banco de dados **Noticias diarias** (`e09a76d515e48385bbf701655fc0e584`).
+- Estrutura de organização:
+  1. Crie ou organize subpastas por **Mês** (ex: `Setembro 2026`) > **Semana** (ex: `Semana 37`) > **Dia** (ex: `13/09/2026`).
+  2. No dia correspondente, inclua o resumo executivo das notícias de cada módulo/categoria (Gospel, Missões, Futebol, Economia/B3, Tecnologia, IA).
+  3. No banco de dados de notícias, cadastre as matérias com o **Nome**, **tag** da categoria e o **link das fontes de pesquisa**.
 
 ## Terminal e Automação
 
