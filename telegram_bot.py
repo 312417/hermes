@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -24,6 +25,30 @@ ALLOWED_IDS = {
     if value.strip().lstrip("-").isdigit()
 }
 POLL_TIMEOUT = 30
+
+
+def memory_intent(text: str) -> tuple[str, str] | None:
+    """Return a durable-memory category and content for explicit memory language."""
+    normalized = text.strip()
+    explicit = re.match(
+        r"^(?:anote(?:\s+na\s+mem[oó]ria)?|lembre(?:-se)?|guarde(?:\s+na\s+mem[oó]ria)?|salve(?:\s+na\s+mem[oó]ria)?)\s*(?:que\s+)?(.+)$",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    identity = re.match(r"^(?:eu\s+sou|meu\s+nome\s+é|me\s+chamo)\s+(.+)$", normalized, flags=re.IGNORECASE)
+    content = (explicit.group(1) if explicit else normalized if identity else "").strip()
+    if not content:
+        return None
+    lowered = content.casefold()
+    if identity or re.match(r"^(?:eu\s+sou|meu\s+nome\s+é|me\s+chamo)\b", lowered):
+        category = "identidade"
+    elif any(word in lowered for word in ("gosto", "prefiro", "não gosto", "nao gosto")):
+        category = "preferências"
+    elif any(word in lowered for word in ("meu projeto", "estou trabalhando", "trabalho com")):
+        category = "projetos"
+    else:
+        category = "memória"
+    return category, content.rstrip(".! ")
 
 
 def telegram_call(method: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -70,6 +95,13 @@ def handle_update(update: dict[str, Any], store: Any, registry: ToolRegistry) ->
         send_message(chat_id, "Este bot ainda não está autorizado para este chat.")
         return
 
+    detected_memory = memory_intent(text)
+    if detected_memory:
+        title, content = detected_memory
+        entry = store.teach(title, content)
+        send_message(chat_id, f"Anotado na memória ({title}): {entry['content']}")
+        return
+
     if text in {"/start", "/help"}:
         send_message(
             chat_id,
@@ -79,6 +111,10 @@ def handle_update(update: dict[str, Any], store: Any, registry: ToolRegistry) ->
             "/tasks — listar tarefas\n"
             "/teach título | conteúdo — salvar conhecimento\n"
             "/ask termos — pesquisar conhecimento\n"
+            "/remember título | conteúdo — salvar memória\n"
+            "/memory — listar memórias\n"
+            "/profile — mostrar perfil\n"
+            "/forget id ou título — remover memória\n"
             "/tools — listar ferramentas",
         )
     elif text == "/tools":

@@ -16,6 +16,10 @@ class ToolRegistry:
             "tasks": self.tasks,
             "teach": self.teach,
             "ask": self.ask,
+            "remember": self.remember,
+            "memory": self.memory,
+            "profile": self.profile,
+            "forget": self.forget,
         }
 
     def names(self) -> list[str]:
@@ -70,3 +74,35 @@ class ToolRegistry:
         return "\n\n".join(
             f"{entry['title']}\n{entry['content']}" for entry in matches
         )
+
+    def remember(self, argument: str) -> str:
+        if "|" not in argument:
+            return "Uso: /remember título | conteúdo"
+        title, content = (part.strip() for part in argument.split("|", 1))
+        if not title or not content:
+            return "Título e conteúdo são obrigatórios."
+        entry = self.store.teach(title, content)
+        return f"Memória salva: {entry['id']} — {entry['title']}"
+
+    def memory(self, _argument: str) -> str:
+        entries = self.store.knowledge()
+        if not entries:
+            return "A memória está vazia."
+        return "\n\n".join(
+            f"{entry['id'][:8]} — {entry['title']}: {entry['content']}"
+            for entry in entries[-30:]
+        )
+
+    def profile(self, _argument: str) -> str:
+        entries = [entry for entry in self.store.knowledge() if entry["title"] in {"identidade", "preferências"}]
+        if not entries:
+            return "Ainda não tenho um perfil salvo."
+        return "\n\n".join(f"{entry['title']}: {entry['content']}" for entry in entries)
+
+    def forget(self, argument: str) -> str:
+        if not argument:
+            return "Uso: /forget id ou título exato"
+        entry = self.store.delete_knowledge(argument)
+        if not entry:
+            return "Não encontrei essa memória."
+        return f"Memória removida: {entry['title']}"

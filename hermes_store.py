@@ -147,6 +147,20 @@ class HermesStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def delete_knowledge(self, reference: str) -> dict | None:
+        reference = reference.strip()
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT id, title, content, created_at FROM knowledge "
+                "WHERE id = ? OR id LIKE ? OR lower(title) = lower(?) "
+                "ORDER BY rowid DESC LIMIT 1",
+                (reference, f"{reference}%", reference),
+            ).fetchone()
+            if not row:
+                return None
+            connection.execute("DELETE FROM knowledge WHERE id = ?", (row["id"],))
+        return dict(row)
+
     def add_memory(self, chat_id: int, role: str, content: str) -> None:
         with self._connect() as connection:
             connection.execute(
