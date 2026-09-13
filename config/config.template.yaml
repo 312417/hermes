@@ -22,7 +22,16 @@ fallback_model:
     model: "models/gemini-3.8-flash"
 
 platform_toolsets:
-  telegram: [web, file, skills, todo, messaging]
+  telegram: [web, file, skills, todo, messaging, mcp]
+
+mcp:
+  servers:
+    notion:
+      transport:
+        type: http
+        url: "https://mcp.notion.com/mcp"
+      auth:
+        type: oauth
 
 telegram:
   dm_policy: "open"
