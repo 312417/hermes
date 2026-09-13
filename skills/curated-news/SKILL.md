@@ -22,16 +22,26 @@ Esta skill permite coletar notícias atualizadas das fontes mais confiáveis map
 - `mercado_financeiro_intl`: Mercados e finanças globais (Reuters).
 
 ## Como executar:
-Execute o script em Python passando o nome da categoria desejada:
 
-```bash
-python3 /root/.hermes/skills/curated-news/fetch_news.py <categoria>
-```
+1. **Por categoria (Fontes curadas base):**
+   ```bash
+   python3 /root/.hermes/skills/curated-news/fetch_news.py <categoria>
+   ```
+   Exemplos: `gospel_br`, `missoes_perseguida`, `tecnologia`, `futebol_br`.
 
-Exemplos:
-- `python3 /root/.hermes/skills/curated-news/fetch_news.py gospel_br`
-- `python3 /root/.hermes/skills/curated-news/fetch_news.py missoes_perseguida`
-- `python3 /root/.hermes/skills/curated-news/fetch_news.py tecnologia`
+2. **Qualquer feed avulso da internet (Dinâmico):**
+   Não fica preso apenas ao catálogo. Se o usuário mandar um link de RSS ou você achar um novo, consulte diretamente:
+   ```bash
+   python3 /root/.hermes/skills/curated-news/fetch_news.py --url <URL_DO_FEED>
+   ```
+
+3. **Adicionar permanentemente uma nova fonte ao catálogo:**
+   ```bash
+   python3 /root/.hermes/skills/curated-news/fetch_news.py --add <categoria> "<Nome da Fonte>" "<URL_DO_FEED>"
+   ```
+
+4. **Buscas abertas complementares:**
+   O `feeds.json` é a sua **lista de confiança base**. Se o usuário pedir um tema muito específico ou notícias de última hora que não estejam nesses feeds, use as ferramentas de busca na web (`web_search`, `newsapi`) para complementar a informação.
 
 ## Diretrizes de Resposta para o Telegram:
 - Apresente um resumo em tópicos (bullet points) claros e objetivos.

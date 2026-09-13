@@ -100,7 +100,45 @@ def get_news(category=None, max_per_source=3):
 
     return all_articles
 
+def add_feed(category, name, url):
+    if not os.path.exists(FEEDS_FILE):
+        catalog = {}
+    else:
+        with open(FEEDS_FILE, "r", encoding="utf-8") as f:
+            catalog = json.load(f)
+
+    if category not in catalog:
+        catalog[category] = []
+
+    # Evita duplicatas
+    for entry in catalog[category]:
+        if entry["url"] == url:
+            return f"Feed '{name}' já existe na categoria '{category}'."
+
+    catalog[category].append({"name": name, "url": url})
+    with open(FEEDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(catalog, f, ensure_ascii=False, indent=2)
+
+    return f"Fonte '{name}' adicionada com sucesso à categoria '{category}'."
+
 if __name__ == "__main__":
-    cat = sys.argv[1] if len(sys.argv) > 1 else "all"
-    results = get_news(cat)
-    print(json.dumps(results, ensure_ascii=False, indent=2))
+    if len(sys.argv) > 1 and sys.argv[1] == "--url" and len(sys.argv) > 2:
+        # Busca em uma URL avulsa passada dinamicamente
+        custom_url = sys.argv[2]
+        results = fetch_feed("Fonte Externa", custom_url, max_items=5)
+        print(json.dumps(results, ensure_ascii=False, indent=2))
+    elif len(sys.argv) > 1 and sys.argv[1] == "--add" and len(sys.argv) >= 5:
+        # Adiciona nova fonte: --add <categoria> <nome> <url>
+        cat = sys.argv[2]
+        name = sys.argv[3]
+        url = sys.argv[4]
+        msg = add_feed(cat, name, url)
+        print(json.dumps({"success": True, "message": msg}, ensure_ascii=False, indent=2))
+    elif len(sys.argv) > 1 and sys.argv[1] == "--list":
+        with open(FEEDS_FILE, "r", encoding="utf-8") as f:
+            print(f.read())
+    else:
+        cat = sys.argv[1] if len(sys.argv) > 1 else "all"
+        results = get_news(cat)
+        print(json.dumps(results, ensure_ascii=False, indent=2))
+
