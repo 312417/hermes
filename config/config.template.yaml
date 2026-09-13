@@ -1,0 +1,37 @@
+# Hermes Agent — Template de configuração
+# Copiar para ~/.hermes/config.yaml no celular e preencher os segredos.
+# Este arquivo NÃO contém valores reais — é seguro para o GitHub.
+#
+# Os segredos ficam em ~/.hermes/.env no celular (nunca no repo):
+#   TELEGRAM_BOT_TOKEN=...
+#   GROQ_API_KEY=...
+#   TELEGRAM_ALLOWED_USERS=<seu-telegram-user-id>
+
+# --- Modelo ---
+model:
+  provider: groq                      # trocar via `hermes model` a qualquer momento
+  default: llama-3.3-70b-versatile
+  # Alternativas configuráveis no .env:
+  #   HERMES_FAST_MODEL=openai/gpt-oss-20b
+  #   HERMES_TEXT_MODEL=llama-3.3-70b-versatile
+  #   HERMES_THINK_MODEL=openai/gpt-oss-120b
+  #   HERMES_RESEARCH_MODEL=groq/compound
+
+# --- Gateway ---
+gateway:
+  telegram:
+    allowed_users: []                 # preencher com Telegram user ID no celular
+
+# --- Memória ---
+memory:
+  enabled: true
+
+# --- Ferramentas ---
+# Começar com tudo desabilitado e liberar progressivamente.
+tools:
+  terminal: false
+  browser: false
+  mcp: []
+
+# --- Fuso horário ---
+timezone: America/Sao_Paulo

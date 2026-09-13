@@ -1,11 +1,17 @@
 #!/data/data/com.termux/files/usr/bin/sh
+# start-hermes — Executado pelo Termux:Boot na inicialização do celular.
+# Mantém o Hermes Agent Gateway rodando continuamente.
 
 termux-wake-lock
 sshd
 
+# Carregar segredos
+[ -f "$HOME/.hermes/.env" ] && . "$HOME/.hermes/.env"
+export HERMES_TIMEZONE="${HERMES_TIMEZONE:-America/Sao_Paulo}"
+
 while true; do
-  proot-distro login ubuntu --user hermes -- bash -lc \
-    'cd /home/hermes/hermes-agent && exec python3 supervisor.py' \
-    >> "$HOME/hermes.log" 2>&1
+  hermes gateway telegram \
+    >> "$HOME/hermes-gateway.log" 2>&1
+  echo "[$(date)] Gateway encerrou, reiniciando em 5s..." >> "$HOME/hermes-gateway.log"
   sleep 5
 done

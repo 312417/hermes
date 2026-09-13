@@ -1,6 +1,27 @@
+# Python
 __pycache__/
 *.py[cod]
-data/
-*.log
-telegram.env
+
+# Segredos — NUNCA commitar
 .env
+*.env
+*.key
+*.pem
+telegram.env
+telegram.env.example
+
+# Dados locais
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Hermes Agent runtime (instalado no celular, não no repo)
+.hermes/
+
+# OS
+.DS_Store
+Thumbs.db

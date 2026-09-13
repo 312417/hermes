@@ -1,69 +1,73 @@
-# Hermes Agent
+# Hermes — Operação e Identidade
 
-Local-first control service. Development happens in Ubuntu on WSL; runtime is
-the Galaxy S20 FE through Termux and Ubuntu proot.
+Repositório de configuração, identidade e deploy do
+[Hermes Agent](https://hermes-agent.nousresearch.com/) (Nous Research) para o
+Galaxy S20 FE via Termux.
 
-Endpoints:
+O agente em si é instalado pelo script oficial; este repositório contém apenas o
+que é exclusivamente nosso: personalidade, regras, skills e scripts de deploy.
 
-- `GET /health`
-- `GET /status`
-- `GET /tasks`
-- `POST /tasks` with JSON `{"title":"..."}`
+## Estrutura
 
-Telegram commands (enabled after configuring the token on the phone):
-
-- `/status`, `/task título | descrição opcional`, `/tasks`, `/done id`
-- `/remind minutos | texto`, `/reminders`
-- `/teach título | conteúdo` to add knowledge
-- `/ask termos` to search the local knowledge base
-- `/remember`, `/memory`, `/profile`, `/forget`, `/clear_session`
-- `/tools` to list the explicit tools
-
-Common actions also work in Portuguese without commands:
-
-- `crie uma tarefa Publicar Hermes | revisar os testes`
-- `tenho que revisar o servidor`
-- `me lembre de beber água em 10 minutos`
-- `me avise de ligar para João amanhã às 9`
-- `quais são minhas tarefas?`, `quais meus lembretes?`, `quem sou eu?`
-- `eu sou o Caio`, `anote na memória que prefiro respostas curtas`
-
-The SQLite database persists the chat session, profile, long-term memory, tasks
-and reminders across service and phone restarts. Profile entries are always
-included in model context; relevant knowledge is added by text search.
-
-Plain text messages use the configured model provider and recent local memory.
-The default deployment uses Groq's OpenAI-compatible Chat Completions API.
-Its local router selects `openai/gpt-oss-20b` for fast replies,
-`llama-3.3-70b-versatile` for writing, `openai/gpt-oss-120b` with high
-reasoning for planning/tasks, and `groq/compound` for explicit current-web
-research. Prefix a message with `#fast`, `#text`, `#think`, or `#research`
-to choose it directly.
-
-On the phone, run `./configure-secrets.sh` from the Hermes directory. It asks
-for the Telegram token and Groq model key without echoing it, writes
-`/home/hermes/.config/hermes/telegram.env` with mode 600, and prints a
-one-time pairing code. Never commit that file.
-
-The service binds to `127.0.0.1:8787` by default. It is intentionally not
-publicly exposed until authentication and a precise use case are defined.
-
-## Runtime layout
-
-```text
-WSL Ubuntu /home/caio/hermes     development and Git
-GitHub                           source backup and collaboration
-Galaxy S20 FE                    always-on runtime
-  Termux -> Ubuntu proot -> hermes
+```
+hermes/
+├── profile/
+│   ├── SOUL.md              # Personalidade: PT-BR, tom direto, fuso horário
+│   └── AGENTS.md            # Regras operacionais: sem YOLO, user único
+├── config/
+│   └── config.template.yaml # Template público (sem segredos)
+├── skills/                  # Skills próprias
+├── docs/
+│   ├── OPERATIONS.md        # Como operar, deploy, rollback
+│   ├── TELEGRAM.md          # Gateway Telegram
+│   └── SECURITY.md          # Postura de segurança
+├── deploy/
+│   ├── deploy-phone.sh      # WSL → celular via SSH
+│   ├── start-hermes         # Termux:Boot
+│   └── health-phone.sh      # Diagnóstico pós-deploy
+└── .gitignore
 ```
 
-The first version uses only the Python standard library, so it remains light
-enough for the phone. `supervisor.py` runs the HTTP service and Telegram
-transport together. The real Telegram token belongs in
-`/home/hermes/.config/hermes/telegram.env` on the phone and must never enter
-GitHub. The first chat is authorized with a one-time `/pair CODE` handshake.
-The Telegram polling loop checks pending reminders every 30 seconds. Configure
-`HERMES_TIMEZONE=America/Sao_Paulo` for natural date interpretation.
+## Quick Start
 
-Run `python3 runtime_check.py --live-model` on the phone for a non-sensitive
-validation of the database, pairing, scheduler state and Groq response.
+```bash
+# 1. Instalar o Hermes oficial no celular (Termux)
+curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+
+# 2. Configurar segredos no celular (nunca no GitHub)
+cat > ~/.hermes/.env << 'EOF'
+TELEGRAM_BOT_TOKEN=<token>
+GROQ_API_KEY=<chave>
+TELEGRAM_ALLOWED_USERS=<user-id>
+HERMES_TIMEZONE=America/Sao_Paulo
+EOF
+chmod 600 ~/.hermes/.env
+
+# 3. Deploy do WSL
+PHONE_SSH_KEY=~/.ssh/phone PHONE_HOST=<ip> PHONE_USER=<user> bash deploy/deploy-phone.sh
+```
+
+## Runtime
+
+```
+WSL Ubuntu /home/caio/hermes     desenvolvimento e Git
+GitHub 312417/hermes              backup e versionamento
+Galaxy S20 FE                     runtime always-on
+  Termux → Hermes Agent oficial → hermes gateway telegram
+```
+
+## Documentação
+
+- [Operações](docs/OPERATIONS.md)
+- [Telegram](docs/TELEGRAM.md)
+- [Segurança](docs/SECURITY.md)
+- [Hermes Agent (oficial)](https://hermes-agent.nousresearch.com/docs/)
+
+## Runtime antigo
+
+O código Python original (polling próprio, API HTTP, SQLite caseiro) está
+preservado na branch `legacy` para referência:
+
+```bash
+git checkout legacy
+```
