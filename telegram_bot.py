@@ -27,16 +27,35 @@ ALLOWED_IDS = {
 POLL_TIMEOUT = 30
 
 
+def memory_request_without_content(text: str) -> bool:
+    return bool(
+        re.fullmatch(
+            r"(?:anote|guarde|lembre(?:-se)?|salve)(?:\s+(?:na|em|no)\s+mem[oó]ria)?[.!? ]*",
+            text.strip(),
+            flags=re.IGNORECASE,
+        )
+    )
+
+
 def memory_intent(text: str) -> tuple[str, str] | None:
     """Return a durable-memory category and content for explicit memory language."""
     normalized = text.strip()
+    if memory_request_without_content(normalized):
+        return None
+    suffix = re.search(
+        r"\s+(?:anote|guarde|lembre(?:-se)?|salve)(?:\s+(?:na|em|no)\s+mem[oó]ria)?[.!? ]*$",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if suffix:
+        normalized = normalized[: suffix.start()].strip()
     explicit = re.match(
         r"^(?:anote(?:\s+na\s+mem[oó]ria)?|lembre(?:-se)?|guarde(?:\s+na\s+mem[oó]ria)?|salve(?:\s+na\s+mem[oó]ria)?)\s*(?:que\s+)?(.+)$",
         normalized,
         flags=re.IGNORECASE,
     )
     identity = re.match(r"^(?:eu\s+sou|meu\s+nome\s+é|me\s+chamo)\s+(.+)$", normalized, flags=re.IGNORECASE)
-    content = (explicit.group(1) if explicit else normalized if identity else "").strip()
+    content = (explicit.group(1) if explicit else normalized if identity or suffix else "").strip()
     if not content:
         return None
     lowered = content.casefold()
@@ -44,8 +63,8 @@ def memory_intent(text: str) -> tuple[str, str] | None:
         category = "identidade"
     elif any(word in lowered for word in ("gosto", "prefiro", "não gosto", "nao gosto")):
         category = "preferências"
-    elif any(word in lowered for word in ("meu projeto", "estou trabalhando", "trabalho com")):
-        category = "projetos"
+    elif any(word in lowered for word in ("meu projeto", "estou trabalhando", "trabalho com", "tenho ")):
+        category = "perfil"
     else:
         category = "memória"
     return category, content.rstrip(".! ")
@@ -100,6 +119,9 @@ def handle_update(update: dict[str, Any], store: Any, registry: ToolRegistry) ->
         title, content = detected_memory
         entry = store.teach(title, content)
         send_message(chat_id, f"Anotado na memória ({title}): {entry['content']}")
+        return
+    if memory_request_without_content(text):
+        send_message(chat_id, "Claro. O que você quer que eu guarde na memória?")
         return
 
     if text in {"/start", "/help"}:
