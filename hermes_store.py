@@ -62,6 +62,16 @@ class HermesStore:
                     chat_id INTEGER NOT NULL,
                     paired_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS reminders (
+                    id TEXT PRIMARY KEY,
+                    chat_id INTEGER NOT NULL,
+                    text TEXT NOT NULL,
+                    due_at TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    delivered_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS reminders_due_idx
+                    ON reminders(delivered_at, due_at);
                 """
             )
             task_columns = {row[1] for row in connection.execute("PRAGMA table_info(tasks)")}
@@ -118,6 +128,20 @@ class HermesStore:
             )
         return task
 
+    def complete_task(self, reference: str) -> dict | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT id, title, description, created_at, state FROM tasks "
+                "WHERE id = ? OR id LIKE ? ORDER BY rowid DESC LIMIT 1",
+                (reference.strip(), f"{reference.strip()}%"),
+            ).fetchone()
+            if not row:
+                return None
+            connection.execute("UPDATE tasks SET state = 'done' WHERE id = ?", (row["id"],))
+            result = dict(row)
+            result["state"] = "done"
+            return result
+
     def knowledge(self) -> list[dict]:
         with self._connect() as connection:
             rows = connection.execute(
@@ -134,11 +158,31 @@ class HermesStore:
             )
         return entry
 
+    def remember_fact(self, title: str, content: str) -> dict:
+        title = title.strip()
+        content = content.strip()
+        with self._connect() as connection:
+            duplicate = connection.execute(
+                "SELECT id, title, content, created_at FROM knowledge "
+                "WHERE lower(title) = lower(?) AND lower(content) = lower(?) LIMIT 1",
+                (title, content),
+            ).fetchone()
+            if duplicate:
+                return dict(duplicate)
+            if title.casefold() == "identidade":
+                connection.execute("DELETE FROM knowledge WHERE lower(title) = 'identidade'")
+            entry = {"id": str(uuid.uuid4()), "title": title, "content": content, "created_at": utc_now()}
+            connection.execute(
+                "INSERT INTO knowledge (id, title, content, created_at) VALUES (?, ?, ?, ?)",
+                (entry["id"], entry["title"], entry["content"], entry["created_at"]),
+            )
+        return entry
+
     def search_knowledge(self, query: str) -> list[dict]:
         terms = [term for term in query.lower().split() if term]
         if not terms:
             return []
-        clauses = " AND ".join("(lower(title) LIKE ? OR lower(content) LIKE ?)" for _ in terms)
+        clauses = " OR ".join("(lower(title) LIKE ? OR lower(content) LIKE ?)" for _ in terms)
         parameters = [value for term in terms for value in (f"%{term}%", f"%{term}%")]
         with self._connect() as connection:
             rows = connection.execute(
@@ -146,6 +190,17 @@ class HermesStore:
                 parameters,
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def context_knowledge(self, query: str, limit: int = 12) -> list[dict]:
+        permanent_titles = {"identidade", "perfil", "preferências", "projetos"}
+        permanent = [entry for entry in self.knowledge() if entry["title"].casefold() in permanent_titles]
+        combined: list[dict] = []
+        seen: set[str] = set()
+        for entry in [*permanent, *self.search_knowledge(query)]:
+            if entry["id"] not in seen:
+                seen.add(entry["id"])
+                combined.append(entry)
+        return combined[-limit:]
 
     def delete_knowledge(self, reference: str) -> dict | None:
         reference = reference.strip()
@@ -174,13 +229,61 @@ class HermesStore:
                 (chat_id, chat_id, limit),
             )
 
-    def recent_memories(self, chat_id: int, limit: int = 12) -> list[dict]:
+    def recent_memories(self, chat_id: int, limit: int | None = None) -> list[dict]:
+        active_limit = limit or int(os.environ.get("HERMES_ACTIVE_CONTEXT_MESSAGES", "24"))
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT role, content, created_at FROM memories WHERE chat_id = ? ORDER BY id DESC LIMIT ?",
-                (chat_id, limit),
+                (chat_id, active_limit),
             ).fetchall()
         return [dict(row) for row in reversed(rows)]
+
+    def clear_session(self, chat_id: int) -> int:
+        with self._connect() as connection:
+            cursor = connection.execute("DELETE FROM memories WHERE chat_id = ?", (chat_id,))
+        return int(cursor.rowcount)
+
+    def add_reminder(self, chat_id: int, text: str, due_at: str) -> dict:
+        reminder = {
+            "id": str(uuid.uuid4()),
+            "chat_id": chat_id,
+            "text": text.strip(),
+            "due_at": due_at,
+            "created_at": utc_now(),
+            "delivered_at": None,
+        }
+        with self._connect() as connection:
+            connection.execute(
+                "INSERT INTO reminders (id, chat_id, text, due_at, created_at, delivered_at) "
+                "VALUES (?, ?, ?, ?, ?, NULL)",
+                (reminder["id"], reminder["chat_id"], reminder["text"], reminder["due_at"], reminder["created_at"]),
+            )
+        return reminder
+
+    def reminders(self, chat_id: int, pending_only: bool = True) -> list[dict]:
+        where = "WHERE chat_id = ? AND delivered_at IS NULL" if pending_only else "WHERE chat_id = ?"
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"SELECT id, chat_id, text, due_at, created_at, delivered_at FROM reminders {where} ORDER BY due_at",
+                (chat_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def due_reminders(self, now: str | None = None) -> list[dict]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT id, chat_id, text, due_at, created_at, delivered_at FROM reminders "
+                "WHERE delivered_at IS NULL AND due_at <= ? ORDER BY due_at LIMIT 20",
+                (now or utc_now(),),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def mark_reminder_delivered(self, reminder_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE reminders SET delivered_at = ? WHERE id = ? AND delivered_at IS NULL",
+                (utc_now(), reminder_id),
+            )
 
     def paired_chat_id(self) -> int | None:
         with self._connect() as connection:

@@ -7,6 +7,7 @@ import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 
 class ModelNotConfigured(RuntimeError):
@@ -113,6 +114,9 @@ def _instructions(knowledge_text: str) -> str:
         "Você é Hermes, um assistente privado e local-first. "
         "Responda em português do Brasil, seja claro, útil e conciso. "
         "Use o conhecimento fornecido e não invente fatos. "
+        "Você possui sessão persistente, perfil, memória permanente, tarefas e lembretes no servidor Hermes. "
+        "Nunca diga que não consegue guardar memória: quando o usuário pedir para lembrar, a camada de ações do Hermes cuida disso. "
+        f"Data UTC atual: {datetime.now(timezone.utc).isoformat()}. "
         "Não afirme executar ações externas ou sensíveis; peça confirmação explícita.\n\n"
         f"Conhecimento local:\n{knowledge_text}"
     )

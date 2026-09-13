@@ -13,6 +13,7 @@ from typing import Any
 
 from hermes_store import default_store
 from model_provider import ModelNotConfigured, provider_from_env
+from natural_language import NaturalAction, local_timezone, parse_natural_action
 from tool_registry import ToolRegistry
 
 
@@ -70,6 +71,34 @@ def memory_intent(text: str) -> tuple[str, str] | None:
     return category, content.rstrip(".! ")
 
 
+def format_due_at(value: str) -> str:
+    from datetime import datetime
+
+    return datetime.fromisoformat(value).astimezone(local_timezone()).strftime("%d/%m/%Y às %H:%M")
+
+
+def natural_action_response(action: NaturalAction, chat_id: int, store: Any, registry: ToolRegistry) -> str:
+    if action.kind == "tasks_list":
+        return registry.tasks("")
+    if action.kind == "reminders_list":
+        return registry.reminders("")
+    if action.kind == "profile":
+        return registry.profile("")
+    if action.kind == "task_create":
+        task = store.add_task(action.values["title"], action.values.get("description", ""))
+        details = f"\nDescrição: {task['description']}" if task["description"] else ""
+        return f"Tarefa criada: {task['title']}{details}"
+    if action.kind == "task_complete":
+        task = store.complete_task(action.values["reference"])
+        return f"Tarefa concluída: {task['title']}" if task else "Não encontrei essa tarefa."
+    if action.kind == "reminder_needs_time":
+        return "Quando devo lembrar? Exemplo: me lembre de beber água em 10 minutos."
+    if action.kind == "reminder_create":
+        reminder = store.add_reminder(chat_id, action.values["text"], action.values["due_at"])
+        return f"Lembrete criado para {format_due_at(reminder['due_at'])}: {reminder['text']}"
+    return "Não consegui interpretar essa ação."
+
+
 def telegram_call(method: str, payload: dict[str, Any]) -> dict[str, Any]:
     request = urllib.request.Request(
         f"{API_ROOT}{TOKEN}/{method}",
@@ -114,14 +143,28 @@ def handle_update(update: dict[str, Any], store: Any, registry: ToolRegistry) ->
         send_message(chat_id, "Este bot ainda não está autorizado para este chat.")
         return
 
+    keep_in_session = not text.startswith("/")
+    if keep_in_session:
+        store.add_memory(chat_id, "user", text)
+
+    def reply(response_text: str) -> None:
+        if keep_in_session:
+            store.add_memory(chat_id, "assistant", response_text)
+        send_message(chat_id, response_text)
+
     detected_memory = memory_intent(text)
     if detected_memory:
         title, content = detected_memory
-        entry = store.teach(title, content)
-        send_message(chat_id, f"Anotado na memória ({title}): {entry['content']}")
+        entry = store.remember_fact(title, content)
+        reply(f"Anotado na memória ({title}): {entry['content']}")
         return
     if memory_request_without_content(text):
-        send_message(chat_id, "Claro. O que você quer que eu guarde na memória?")
+        reply("Claro. O que você quer que eu guarde na memória?")
+        return
+
+    natural_action = parse_natural_action(text)
+    if natural_action:
+        reply(natural_action_response(natural_action, chat_id, store, registry))
         return
 
     if text in {"/start", "/help"}:
@@ -131,12 +174,16 @@ def handle_update(update: dict[str, Any], store: Any, registry: ToolRegistry) ->
             "/status — estado do serviço\n"
             "/task título — criar tarefa\n"
             "/tasks — listar tarefas\n"
+            "/done id — concluir tarefa\n"
+            "/remind minutos | texto — criar lembrete\n"
+            "/reminders — listar lembretes\n"
             "/teach título | conteúdo — salvar conhecimento\n"
             "/ask termos — pesquisar conhecimento\n"
             "/remember título | conteúdo — salvar memória\n"
             "/memory — listar memórias\n"
             "/profile — mostrar perfil\n"
             "/forget id ou título — remover memória\n"
+            "/clear_session — limpar conversa, preservando perfil\n"
             "/tools — listar ferramentas",
         )
     elif text == "/tools":
@@ -145,21 +192,25 @@ def handle_update(update: dict[str, Any], store: Any, registry: ToolRegistry) ->
         command, _, argument = text[1:].partition(" ")
         send_message(chat_id, registry.run(command, argument))
     else:
-        store.add_memory(chat_id, "user", text)
         try:
             provider = provider_from_env()
             if provider is None:
-                send_message(chat_id, "Modelo ainda não configurado. Use /teach título | conteúdo ou configure o provedor e a chave de API no celular.")
+                reply("Modelo ainda não configurado. Use /teach título | conteúdo ou configure o provedor e a chave de API no celular.")
                 return
             response = provider.respond(
-                store.recent_memories(chat_id), store.search_knowledge(text), prompt=text
+                store.recent_memories(chat_id), store.context_knowledge(text), prompt=text
             )
         except (ModelNotConfigured, RuntimeError) as error:
             print(f"model error: {error}", flush=True)
-            send_message(chat_id, "Não consegui consultar o modelo agora; tente novamente.")
+            reply("Não consegui consultar o modelo agora; tente novamente.")
             return
-        store.add_memory(chat_id, "assistant", response)
-        send_message(chat_id, response)
+        reply(response)
+
+
+def deliver_due_reminders(store: Any) -> None:
+    for reminder in store.due_reminders():
+        send_message(int(reminder["chat_id"]), f"⏰ Lembrete: {reminder['text']}")
+        store.mark_reminder_delivered(reminder["id"])
 
 
 def main() -> None:
@@ -177,6 +228,7 @@ def main() -> None:
             for update in response.get("result", []):
                 offset = max(offset, int(update["update_id"]) + 1)
                 handle_update(update, store, registry)
+            deliver_due_reminders(store)
         except (urllib.error.URLError, TimeoutError, OSError, RuntimeError, json.JSONDecodeError) as error:
             print(f"Telegram transport error: {error}", flush=True)
             time.sleep(5)

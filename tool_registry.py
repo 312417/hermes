@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 
 from hermes_store import HermesStore
 
@@ -20,6 +21,10 @@ class ToolRegistry:
             "memory": self.memory,
             "profile": self.profile,
             "forget": self.forget,
+            "remind": self.remind,
+            "reminders": self.reminders,
+            "done": self.done,
+            "clear_session": self.clear_session,
         }
 
     def names(self) -> list[str]:
@@ -32,7 +37,9 @@ class ToolRegistry:
         return tool(argument.strip())
 
     def status(self, _argument: str) -> str:
-        return f"tarefas={len(self.store.tasks())} conhecimento={len(self.store.knowledge())}"
+        chat_id = self.store.paired_chat_id()
+        reminder_count = len(self.store.reminders(chat_id)) if chat_id is not None else 0
+        return f"tarefas={len(self.store.tasks())} lembretes={reminder_count} conhecimento={len(self.store.knowledge())}"
 
     def task(self, argument: str) -> str:
         if not argument:
@@ -94,7 +101,10 @@ class ToolRegistry:
         )
 
     def profile(self, _argument: str) -> str:
-        entries = [entry for entry in self.store.knowledge() if entry["title"] in {"identidade", "preferências"}]
+        entries = [
+            entry for entry in self.store.knowledge()
+            if entry["title"].casefold() in {"identidade", "perfil", "preferências", "projetos"}
+        ]
         if not entries:
             return "Ainda não tenho um perfil salvo."
         return "\n\n".join(f"{entry['title']}: {entry['content']}" for entry in entries)
@@ -106,3 +116,42 @@ class ToolRegistry:
         if not entry:
             return "Não encontrei essa memória."
         return f"Memória removida: {entry['title']}"
+
+    def remind(self, argument: str) -> str:
+        if "|" not in argument:
+            return "Uso: /remind minutos | texto do lembrete"
+        minutes_text, reminder_text = (part.strip() for part in argument.split("|", 1))
+        if not minutes_text.isdigit() or not reminder_text:
+            return "Informe os minutos e o texto. Exemplo: /remind 10 | beber água"
+        chat_id = self.store.paired_chat_id()
+        if chat_id is None:
+            return "O chat ainda não está pareado."
+        due_at = (datetime.now(timezone.utc) + timedelta(minutes=int(minutes_text))).isoformat()
+        reminder = self.store.add_reminder(chat_id, reminder_text, due_at)
+        return f"Lembrete criado: {reminder['id'][:8]} — {reminder['text']}"
+
+    def reminders(self, _argument: str) -> str:
+        chat_id = self.store.paired_chat_id()
+        if chat_id is None:
+            return "O chat ainda não está pareado."
+        reminders = self.store.reminders(chat_id)
+        if not reminders:
+            return "Nenhum lembrete pendente."
+        return "\n".join(
+            f"• {item['id'][:8]} — {item['due_at']} — {item['text']}" for item in reminders[-20:]
+        )
+
+    def done(self, argument: str) -> str:
+        if not argument:
+            return "Uso: /done id da tarefa"
+        task = self.store.complete_task(argument)
+        if not task:
+            return "Não encontrei essa tarefa."
+        return f"Tarefa concluída: {task['title']}"
+
+    def clear_session(self, _argument: str) -> str:
+        chat_id = self.store.paired_chat_id()
+        if chat_id is None:
+            return "O chat ainda não está pareado."
+        count = self.store.clear_session(chat_id)
+        return f"Sessão limpa: {count} mensagens removidas. O perfil e as memórias permanentes foram preservados."
