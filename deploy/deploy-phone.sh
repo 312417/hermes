@@ -52,6 +52,7 @@ fi
 ssh "${SSH_OPTS[@]}" "$REMOTE" 'proot-distro login ubuntu -- bash -c "
   cp -r /data/data/com.termux/files/home/.hermes/profile/* /root/.hermes/profile/
   cp /data/data/com.termux/files/home/.hermes/config.template.yaml /root/.hermes/config.template.yaml
+  [ -f /root/.hermes/config.yaml ] || cp /root/.hermes/config.template.yaml /root/.hermes/config.yaml
 "'
 
 echo "==> Instalando script de boot"
