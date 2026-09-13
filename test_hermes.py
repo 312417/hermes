@@ -3,10 +3,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 from hermes_store import HermesStore
 from natural_language import parse_natural_action
-from telegram_bot import memory_intent, memory_request_without_content
+from telegram_bot import deliver_due_reminders, handle_update, memory_intent, memory_request_without_content
 from tool_registry import ToolRegistry
 
 
@@ -78,6 +79,21 @@ class StoreTests(unittest.TestCase):
         registry = ToolRegistry(self.store)
         self.assertIn("Lembrete criado", registry.run("remind", "5 | teste"))
         self.assertIn("teste", registry.run("reminders"))
+
+    @patch("telegram_bot.send_message")
+    def test_telegram_natural_task_end_to_end(self, send_message) -> None:
+        self.store.pair_chat(123)
+        update = {"message": {"chat": {"id": 123}, "text": "crie uma tarefa Publicar | revisar"}}
+        handle_update(update, self.store, ToolRegistry(self.store))
+        self.assertEqual(self.store.tasks()[0]["title"], "Publicar")
+        self.assertIn("Tarefa criada", send_message.call_args.args[1])
+
+    @patch("telegram_bot.send_message")
+    def test_reminder_delivery_end_to_end(self, send_message) -> None:
+        reminder = self.store.add_reminder(123, "beber água", "2026-09-12T18:00:00+00:00")
+        deliver_due_reminders(self.store)
+        send_message.assert_called_once_with(123, "⏰ Lembrete: beber água")
+        self.assertNotIn(reminder["id"], {item["id"] for item in self.store.due_reminders("2999-01-01T00:00:00+00:00")})
 
 
 if __name__ == "__main__":

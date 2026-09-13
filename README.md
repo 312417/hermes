@@ -64,3 +64,6 @@ transport together. The real Telegram token belongs in
 GitHub. The first chat is authorized with a one-time `/pair CODE` handshake.
 The Telegram polling loop checks pending reminders every 30 seconds. Configure
 `HERMES_TIMEZONE=America/Sao_Paulo` for natural date interpretation.
+
+Run `python3 runtime_check.py --live-model` on the phone for a non-sensitive
+validation of the database, pairing, scheduler state and Groq response.
