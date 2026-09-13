@@ -10,41 +10,44 @@
 #   - Termux:Boot instalado
 set -euo pipefail
 
-: "${PHONE_SSH_KEY:?Set PHONE_SSH_KEY to the private SSH key path}"
-: "${PHONE_HOST:?Set PHONE_HOST to the phone IP or hostname}"
-: "${PHONE_USER:?Set PHONE_USER to the Termux SSH user}"
+PHONE_SSH_KEY="${PHONE_SSH_KEY:-$HOME/.ssh/id_phone}"
+PHONE_HOST="${PHONE_HOST:-192.168.15.41}"
+PHONE_USER="${PHONE_USER:-termux}"
 PHONE_PORT="${PHONE_PORT:-8022}"
 REMOTE="${PHONE_USER}@${PHONE_HOST}"
-SSH_OPTS=(-p "$PHONE_PORT" -i "$PHONE_SSH_KEY" -o ConnectTimeout=10)
+SSH_OPTS=(-p "$PHONE_PORT" -i "$PHONE_SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10)
 
 echo "==> Verificando conexão com $REMOTE:$PHONE_PORT"
 ssh "${SSH_OPTS[@]}" "$REMOTE" 'echo "Conectado: $(uname -m) $(date)"'
 
+echo "==> Parando processos legados anteriores se existirem"
+ssh "${SSH_OPTS[@]}" "$REMOTE" 'pkill -f "python3.*(server\.py|telegram_bot\.py|supervisor\.py)" 2>/dev/null || true'
+
 echo "==> Verificando se o Hermes oficial está instalado"
 ssh "${SSH_OPTS[@]}" "$REMOTE" 'command -v hermes >/dev/null || {
   echo "Hermes não encontrado. Instalando...";
-  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash;
-  source ~/.bashrc;
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup;
+  source ~/.bashrc 2>/dev/null || true;
 }'
 
-echo "==> Enviando configuração e scripts"
-rsync -avz --delete -e "ssh ${SSH_OPTS[*]}" \
-  profile/ "$REMOTE:~/.hermes/profile/"
+echo "==> Criando diretórios no celular"
+ssh "${SSH_OPTS[@]}" "$REMOTE" 'mkdir -p ~/.hermes/profile ~/.hermes/skills ~/.termux/boot'
 
-rsync -avz -e "ssh ${SSH_OPTS[*]}" \
-  config/config.template.yaml "$REMOTE:~/.hermes/config.template.yaml"
-
-rsync -avz -e "ssh ${SSH_OPTS[*]}" \
-  skills/ "$REMOTE:~/.hermes/skills/"
+echo "==> Enviando configuração e perfis"
+scp "${SSH_OPTS[@]}" profile/* "$REMOTE:~/.hermes/profile/"
+scp "${SSH_OPTS[@]}" config/config.template.yaml "$REMOTE:~/.hermes/config.template.yaml"
+if [ -d skills ] && [ "$(ls -A skills 2>/dev/null)" ]; then
+  scp -r "${SSH_OPTS[@]}" skills/* "$REMOTE:~/.hermes/skills/" || true
+fi
 
 echo "==> Instalando script de boot"
 scp "${SSH_OPTS[@]}" deploy/start-hermes "$REMOTE:~/start-hermes"
 ssh "${SSH_OPTS[@]}" "$REMOTE" \
-  'mkdir -p ~/.termux/boot; install -m 700 ~/start-hermes ~/.termux/boot/20-hermes; rm ~/start-hermes'
+  'install -m 700 ~/start-hermes ~/.termux/boot/20-hermes; rm -f ~/start-hermes'
 
 echo "==> Reiniciando gateway"
 ssh "${SSH_OPTS[@]}" "$REMOTE" \
-  'pkill -f "hermes gateway" || true; sleep 2; nohup ~/.termux/boot/20-hermes >/dev/null 2>&1 &'
+  'pkill -f "hermes gateway" 2>/dev/null || true; sleep 2; nohup ~/.termux/boot/20-hermes >/dev/null 2>&1 &'
 
 echo "==> Aguardando inicialização (5s)"
 sleep 5

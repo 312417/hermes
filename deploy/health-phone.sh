@@ -5,12 +5,12 @@
 #   PHONE_SSH_KEY=~/.ssh/phone PHONE_HOST=192.168.x.x PHONE_USER=u0_a123 ./deploy/health-phone.sh
 set -euo pipefail
 
-: "${PHONE_SSH_KEY:?Set PHONE_SSH_KEY to the private SSH key path}"
-: "${PHONE_HOST:?Set PHONE_HOST to the phone IP or hostname}"
-: "${PHONE_USER:?Set PHONE_USER to the Termux SSH user}"
+PHONE_SSH_KEY="${PHONE_SSH_KEY:-$HOME/.ssh/id_phone}"
+PHONE_HOST="${PHONE_HOST:-192.168.15.41}"
+PHONE_USER="${PHONE_USER:-termux}"
 PHONE_PORT="${PHONE_PORT:-8022}"
 REMOTE="${PHONE_USER}@${PHONE_HOST}"
-SSH_OPTS=(-p "$PHONE_PORT" -i "$PHONE_SSH_KEY" -o ConnectTimeout=10)
+SSH_OPTS=(-p "$PHONE_PORT" -i "$PHONE_SSH_KEY" -o StrictHostKeyChecking=no -o ConnectTimeout=10)
 
 echo "==> Verificando processo do gateway"
 if ssh "${SSH_OPTS[@]}" "$REMOTE" 'pgrep -f "hermes gateway" >/dev/null'; then
