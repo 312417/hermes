@@ -159,13 +159,13 @@ custom_providers:
 
 model:
   provider: "opencodex"
-  default: "gpt-6-luna"
+  default: "google-antigravity/gemini-3.8-flash"
   max_history: 10        # Janela deslizante: 10 últimas mensagens
   max_tokens: 4000
 
 fallback_model:
   - provider: "opencodex"
-    model: "google-antigravity/gemini-3.8-flash"
+    model: "gpt-6-luna"
   - provider: "openrouter"
     model: "google/gemini-3.8-flash"
 
