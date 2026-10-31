@@ -1,0 +1,19 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# dashboard-tunnel service run script
+exec 2>&1
+
+echo "[$(date -Iseconds)] Aguardando Hermes Dashboard estar ouvindo na porta 9119..."
+for i in $(seq 1 30); do
+  if curl -s -m 2 http://127.0.0.1:9119/ >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+echo "[$(date -Iseconds)] Iniciando túnel Cloudflare para o Dashboard..."
+exec cloudflared tunnel \
+  --protocol http2 \
+  --edge-ip-version 4 \
+  --http-host-header 127.0.0.1:9119 \
+  --url http://127.0.0.1:9119 \
+  --logfile "$HOME/cloudflared_dashboard.log"

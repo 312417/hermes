@@ -1,0 +1,257 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# hermes — Unified management CLI for Hermes Agent infrastructure on Samsung S20 FE
+set -u
+
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+HOME="${HOME:-/data/data/com.termux/files/home}"
+export SVDIR="${SVDIR:-$PREFIX/var/service}"
+export LOGDIR="${LOGDIR:-$PREFIX/var/log}"
+OPS_DIR="$HOME/.hermes-ops"
+SERVICES="opencodex hermes-gateway hermes-dashboard dashboard-tunnel hermes-watchdog"
+
+# Colors
+GREEN="\033[0;32m"
+RED="\033[0;31m"
+YELLOW="\033[0;33m"
+CYAN="\033[0;36m"
+BOLD="\033[1m"
+NC="\033[0m"
+
+ensure_daemon() {
+  if ! pgrep -f "runsvdir.*service" >/dev/null 2>&1; then
+    echo "Iniciando supervisor (service-daemon)..."
+    service-daemon start >/dev/null 2>&1 || true
+    sleep 2
+  fi
+}
+
+cmd_up() {
+  ensure_daemon
+  echo "Subindo todos os serviços do Hermes..."
+  for s in $SERVICES; do
+    if [ -d "$SVDIR/$s" ]; then
+      sv up "$s" >/dev/null 2>&1 || sv start "$s" >/dev/null 2>&1 || true
+      printf "  ✓ %s\n" "$s"
+    fi
+  done
+  echo "Todos os serviços foram acionados."
+  echo "Execute 'hermes health' para verificar o estado."
+}
+
+cmd_force_up() {
+  echo "${YELLOW}Executando reinicialização forçada e limpa (--force up)...${NC}"
+  # Clear locks and backoff
+  rm -f "$OPS_DIR/state/recover.lock" 2>/dev/null || true
+  rm -f "$OPS_DIR/state/restarts.log" 2>/dev/null || true
+
+  # Stop services in reverse order
+  echo "Encerrando serviços de forma controlada..."
+  for s in hermes-watchdog dashboard-tunnel hermes-dashboard hermes-gateway opencodex; do
+    if [ -d "$SVDIR/$s" ]; then
+      sv -w 5 stop "$s" >/dev/null 2>&1 || sv -w 2 force-stop "$s" >/dev/null 2>&1 || true
+    fi
+  done
+
+  # Terminate any stray orphaned processes
+  pkill -9 -f "bun.*opencodex" 2>/dev/null || true
+  pkill -9 -f "node.*ocx" 2>/dev/null || true
+  pkill -9 -f "cloudflared.*9119" 2>/dev/null || true
+
+  sleep 2
+  ensure_daemon
+
+  echo "Iniciando serviços na ordem de dependência..."
+  for s in opencodex hermes-gateway hermes-dashboard dashboard-tunnel hermes-watchdog; do
+    if [ -d "$SVDIR/$s" ]; then
+      sv up "$s" >/dev/null 2>&1 || sv start "$s" >/dev/null 2>&1 || true
+      printf "  ✓ %s iniciado\n" "$s"
+      sleep 2
+    fi
+  done
+
+  echo "${GREEN}Reinicialização forçada concluída.${NC}"
+  cmd_health
+}
+
+cmd_down() {
+  echo "Parando todos os serviços do Hermes..."
+  for s in hermes-watchdog dashboard-tunnel hermes-dashboard hermes-gateway opencodex; do
+    if [ -d "$SVDIR/$s" ]; then
+      sv -w 10 stop "$s" >/dev/null 2>&1 || sv -w 3 force-stop "$s" >/dev/null 2>&1 || true
+      printf "  ✓ %s parado\n" "$s"
+    fi
+  done
+  echo "Serviços parados com sucesso."
+}
+
+cmd_restart() {
+  _target="${1:-}"
+  ensure_daemon
+  if [ -z "$_target" ]; then
+    cmd_force_up
+    return
+  fi
+  if [ -d "$SVDIR/$_target" ]; then
+    echo "Reiniciando serviço $_target..."
+    sv -w 10 restart "$_target" || sv -w 5 force-restart "$_target" || true
+    sv status "$_target"
+  else
+    echo "${RED}Serviço desconhecido: $_target${NC}"
+    echo "Serviços disponíveis: $SERVICES"
+    exit 1
+  fi
+}
+
+cmd_ps() {
+  printf "${BOLD}%-20s %-10s %-8s %-10s${NC}\n" "SERVIÇO" "STATUS" "PID" "TEMPO"
+  printf "%s\n" "--------------------------------------------------------"
+  for s in $SERVICES sshd; do
+    if [ -d "$SVDIR/$s" ]; then
+      st=$(sv status "$s" 2>/dev/null || echo "down")
+      printf "%s\n" "$st"
+    fi
+  done
+}
+
+cmd_health() {
+  if [ -x "$OPS_DIR/bin/hermes-health" ]; then
+    "$OPS_DIR/bin/hermes-health"
+  else
+    echo "hermes-health não encontrado."
+  fi
+}
+
+cmd_logs() {
+  _svc="${1:-hermes-gateway}"
+  _follow="${2:-}"
+  if [ "$_svc" = "-f" ]; then
+    _svc="hermes-gateway"
+    _follow="-f"
+  fi
+
+  _logdir="$LOGDIR/sv/$_svc"
+  if [ -d "$_logdir" ]; then
+    if [ "$_follow" = "-f" ]; then
+      tail -f "$_logdir/current"
+    else
+      tail -n 40 "$_logdir/current"
+    fi
+  elif [ -f "$HOME/$_svc.log" ]; then
+    if [ "$_follow" = "-f" ]; then
+      tail -f "$HOME/$_svc.log"
+    else
+      tail -n 40 "$HOME/$_svc.log"
+    fi
+  else
+    echo "Log para '$_svc' não encontrado em $_logdir ou $HOME/$_svc.log"
+  fi
+}
+
+cmd_events() {
+  _events_file="$OPS_DIR/logs/events.log"
+  if [ -f "$_events_file" ]; then
+    printf "${BOLD}Últimos eventos e diagnósticos de recuperação:${NC}\n"
+    tail -n 30 "$_events_file"
+  else
+    echo "Nenhum evento registrado ainda em $_events_file"
+  fi
+}
+
+cmd_backup() {
+  if [ -x "$OPS_DIR/bin/hermes-backup" ]; then
+    "$OPS_DIR/bin/hermes-backup" "$@"
+  else
+    echo "hermes-backup não encontrado."
+  fi
+}
+
+cmd_url() {
+  url=$(grep -o "https://[a-zA-Z0-9.-]*\.trycloudflare\.com" "$HOME/cloudflared_dashboard.log" 2>/dev/null | tail -1 || true)
+  printf "${BOLD}URLs do Hermes Dashboard:${NC}\n"
+  printf "  Local:   http://127.0.0.1:9119/\n"
+  if [ -n "$url" ]; then
+    printf "  Público: %s\n" "$url"
+  else
+    printf "  Público: (túnel ainda conectando ou indisponível)\n"
+  fi
+}
+
+cmd_disable() {
+  echo "Desativando supervisor automático do Hermes..."
+  cmd_down
+  touch "$OPS_DIR/state/disabled"
+  echo "Supervisor automático desativado. Use 'hermes enable' para reativar."
+}
+
+cmd_enable() {
+  rm -f "$OPS_DIR/state/disabled"
+  echo "Supervisor automático ativado."
+  cmd_up
+}
+
+# Main dispatcher
+ACTION="${1:-}"
+
+case "$ACTION" in
+  up)
+    cmd_up
+    ;;
+  --force|--force-up|force-up)
+    cmd_force_up
+    ;;
+  down|stop)
+    cmd_down
+    ;;
+  restart)
+    shift
+    cmd_restart "${1:-}"
+    ;;
+  ps)
+    cmd_ps
+    ;;
+  health)
+    cmd_health
+    ;;
+  logs|log)
+    shift
+    cmd_logs "${1:-}" "${2:-}"
+    ;;
+  events)
+    cmd_events
+    ;;
+  backup)
+    shift
+    cmd_backup "$@"
+    ;;
+  url)
+    cmd_url
+    ;;
+  disable)
+    cmd_disable
+    ;;
+  enable)
+    cmd_enable
+    ;;
+  help|-h|--help)
+    echo "Uso: hermes <comando>"
+    echo ""
+    echo "Comandos operacionais locais:"
+    echo "  hermes up              - Inicia todos os serviços do Hermes"
+    echo "  hermes --force up      - Reinicialização limpa e controlada de toda a infra"
+    echo "  hermes down            - Encerra todos os serviços de forma controlada"
+    echo "  hermes restart [svc]   - Reinicia um serviço específico ou todos"
+    echo "  hermes health          - Executa diagnóstico completo de saúde"
+    echo "  hermes ps              - Mostra status e PIDs de todos os serviços"
+    echo "  hermes logs [svc] [-f] - Exibe ou segue os logs rotacionados do serviço"
+    echo "  hermes events          - Exibe histórico de falhas e recuperações"
+    echo "  hermes backup [--full] - Gera backup rápido ou completo para ~/hermes-backups"
+    echo "  hermes url             - Mostra URLs local e pública do Dashboard"
+    echo "  hermes disable/enable  - Desativa ou reativa a recuperação automática"
+    echo ""
+    echo "Outros comandos serão repassados ao Hermes Agent no Ubuntu (ex: hermes status, doctor, etc.)"
+    ;;
+  *)
+    # Pass through to native Hermes inside PRoot Ubuntu
+    exec env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD /usr/local/bin/hermes "$@"
+    ;;
+esac

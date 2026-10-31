@@ -1,0 +1,11 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# hermes-dashboard service run script
+exec 2>&1
+
+echo "[$(date -Iseconds)] Iniciando Hermes Dashboard na porta 9119..."
+exec env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD bash -lc '
+  export HERMES_TIMEZONE="America/Sao_Paulo"
+  [ -f /root/.hermes/.env ] && set -a && . /root/.hermes/.env && set +a
+  cd /root/hermes-agent
+  exec /usr/local/bin/hermes dashboard --port 9119 --host 127.0.0.1 --skip-build --no-open
+'

@@ -1,0 +1,40 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# hermes-watchdog service run script
+exec 2>&1
+
+HOME="${HOME:-/data/data/com.termux/files/home}"
+OPS_DIR="$HOME/.hermes-ops"
+STATE_DIR="$OPS_DIR/state"
+
+mkdir -p "$STATE_DIR"
+echo "[$(date -Iseconds)] Iniciando Watchdog do Hermes (ciclo: 60s)..."
+
+while true; do
+  sleep 60
+
+  # Check if automatic recovery is disabled by operator
+  if [ -f "$STATE_DIR/disabled" ]; then
+    continue
+  fi
+
+  # Run recovery engine if needed
+  if [ -x "$OPS_DIR/bin/hermes-recover" ]; then
+    "$OPS_DIR/bin/hermes-recover" || true
+  fi
+
+  # Check for daily backup schedule (~03:30 AM local time)
+  CURRENT_HOUR=$(date +%H)
+  CURRENT_MIN=$(date +%M)
+  TODAY=$(date +%Y-%m-%d)
+  LAST_BACKUP_DATE=$(cat "$STATE_DIR/last_backup_date" 2>/dev/null || echo "")
+
+  if [ "$CURRENT_HOUR" = "03" ] && [ "$CURRENT_MIN" -ge 30 ] && [ "$LAST_BACKUP_DATE" != "$TODAY" ]; then
+    DOW=$(date +%u) # 1=Monday, 7=Sunday
+    if [ "$DOW" = "7" ]; then
+      "$OPS_DIR/bin/hermes-backup" --full || true
+    else
+      "$OPS_DIR/bin/hermes-backup" || true
+    fi
+    echo "$TODAY" > "$STATE_DIR/last_backup_date"
+  fi
+done

@@ -1,0 +1,19 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# hermes-gateway service run script
+exec 2>&1
+
+echo "[$(date -Iseconds)] Aguardando OpenCodex estar saudável antes de iniciar Hermes Gateway..."
+for i in $(seq 1 30); do
+  if curl -s -m 2 http://127.0.0.1:10100/healthz >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+echo "[$(date -Iseconds)] Iniciando Hermes Gateway..."
+exec env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD bash -lc '
+  export HERMES_TIMEZONE="America/Sao_Paulo"
+  [ -f /root/.hermes/.env ] && set -a && . /root/.hermes/.env && set +a
+  cd /root/hermes-agent
+  exec /usr/local/bin/hermes gateway run
+'

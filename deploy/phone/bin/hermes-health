@@ -1,0 +1,165 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# hermes-health — Real health inspection for Hermes stack on S20 FE
+set -u
+
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+HOME="${HOME:-/data/data/com.termux/files/home}"
+TIMEOUT_CMD="timeout -s 9"
+
+# Colors for interactive output
+GREEN="\033[0;32m"
+RED="\033[0;31m"
+YELLOW="\033[0;33m"
+CYAN="\033[0;36m"
+NC="\033[0m"
+
+JSON_MODE=0
+if [ "${1:-}" = "--json" ]; then
+  JSON_MODE=1
+fi
+
+check_internet() {
+  # Fast ping-like HTTP check
+  if curl -s -m 4 -o /dev/null https://1.1.1.1 >/dev/null 2>&1 || \
+     curl -s -m 4 -o /dev/null https://api.telegram.org >/dev/null 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+check_proot() {
+  $TIMEOUT_CMD 15 env -u LD_PRELOAD proot-distro login ubuntu -- true >/dev/null 2>&1
+  return $?
+}
+
+check_opencodex() {
+  res=$(curl -s -m 4 http://127.0.0.1:10100/healthz 2>/dev/null || true)
+  case "$res" in
+    *'"status":"ok"'*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+check_gateway_proc() {
+  pid=$(pgrep -f "hermes gateway run" | head -n 1)
+  if [ -z "$pid" ]; then
+    return 1
+  fi
+  state=$(ps -o stat= -p "$pid" 2>/dev/null | tr -d ' ' || true)
+  case "$state" in
+    *T*|*Z*) return 2 ;; # Stopped or Zombie
+    *) return 0 ;;
+  esac
+}
+
+check_gateway_response() {
+  # Query gateway status via CLI inside PRoot with 25s timeout
+  out=$($TIMEOUT_CMD 25 env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD /usr/local/bin/hermes status 2>/dev/null || true)
+  case "$out" in
+    *Gateway:*running*|*"Gateway:      ✓ running"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+check_dashboard() {
+  code=$(curl -s -m 3 -o /dev/null -w "%{http_code}" http://127.0.0.1:9119/ 2>/dev/null || echo "000")
+  if [ "$code" = "200" ]; then
+    return 0
+  fi
+  return 1
+}
+
+check_tunnel() {
+  if pgrep -f "cloudflared.*9119" >/dev/null 2>&1; then
+    url=$(grep -o "https://[a-zA-Z0-9.-]*\.trycloudflare\.com" "$HOME/cloudflared_dashboard.log" 2>/dev/null | tail -1 || true)
+    if [ -n "$url" ]; then
+      return 0
+    fi
+    return 2 # Running but no URL yet
+  fi
+  return 1
+}
+
+# Run all checks
+T_START=$(date +%s%N 2>/dev/null || date +%s)
+
+check_internet && NET_OK=1 || NET_OK=0
+check_proot && PROOT_OK=1 || PROOT_OK=0
+check_opencodex && OCX_OK=1 || OCX_OK=0
+check_gateway_proc
+GW_PROC_RES=$?
+check_gateway_response && GW_RESP_OK=1 || GW_RESP_OK=0
+check_dashboard && DASH_OK=1 || DASH_OK=0
+check_tunnel
+TUN_RES=$?
+
+ALL_OK=1
+if [ "$PROOT_OK" -ne 1 ] || [ "$OCX_OK" -ne 1 ] || [ "$GW_PROC_RES" -ne 0 ] || [ "$GW_RESP_OK" -ne 1 ] || [ "$DASH_OK" -ne 1 ]; then
+  ALL_OK=0
+fi
+
+if [ "$JSON_MODE" -eq 1 ]; then
+  printf '{"internet":%d,"proot":%d,"opencodex":%d,"gateway_proc":%d,"gateway_resp":%d,"dashboard":%d,"tunnel":%d,"healthy":%d}\n' \
+    "$NET_OK" "$PROOT_OK" "$OCX_OK" "$GW_PROC_RES" "$GW_RESP_OK" "$DASH_OK" "$TUN_RES" "$ALL_OK"
+  exit $((1 - ALL_OK))
+fi
+
+printf "${CYAN}====================================================${NC}\n"
+printf "${CYAN}      HERMES AGENT HEALTH CHECK — SAMSUNG S20 FE    ${NC}\n"
+printf "${CYAN}====================================================${NC}\n"
+
+if [ "$NET_OK" -eq 1 ]; then
+  printf " [${GREEN}OK${NC}] Internet: Conectado (DNS + HTTP)\n"
+else
+  printf " [${YELLOW}AVISO${NC}] Internet: Indisponível (Modo Offline / Sem Rede Externa)\n"
+fi
+
+if [ "$PROOT_OK" -eq 1 ]; then
+  printf " [${GREEN}OK${NC}] PRoot Ubuntu: Responsivo\n"
+else
+  printf " [${RED}FALHA${NC}] PRoot Ubuntu: Não respondeu ao comando em 15s\n"
+fi
+
+if [ "$OCX_OK" -eq 1 ]; then
+  printf " [${GREEN}OK${NC}] OpenCodex (:10100): Saudável (/healthz = ok)\n"
+else
+  printf " [${RED}FALHA${NC}] OpenCodex (:10100): Não respondeu /healthz\n"
+fi
+
+if [ "$GW_PROC_RES" -eq 0 ]; then
+  printf " [${GREEN}OK${NC}] Hermes Gateway Processo: Ativo\n"
+elif [ "$GW_PROC_RES" -eq 2 ]; then
+  printf " [${RED}FALHA${NC}] Hermes Gateway Processo: Travado / Parado (State T/Z)\n"
+else
+  printf " [${RED}FALHA${NC}] Hermes Gateway Processo: Não encontrado\n"
+fi
+
+if [ "$GW_RESP_OK" -eq 1 ]; then
+  printf " [${GREEN}OK${NC}] Hermes Gateway Status: Respondendo e Ativo\n"
+else
+  printf " [${RED}FALHA${NC}] Hermes Gateway Status: Socket/API não respondeu\n"
+fi
+
+if [ "$DASH_OK" -eq 1 ]; then
+  printf " [${GREEN}OK${NC}] Dashboard Web (:9119): HTTP 200 OK\n"
+else
+  printf " [${RED}FALHA${NC}] Dashboard Web (:9119): Fora do ar ou erro HTTP\n"
+fi
+
+if [ "$TUN_RES" -eq 0 ]; then
+  url=$(grep -o "https://[a-zA-Z0-9.-]*\.trycloudflare\.com" "$HOME/cloudflared_dashboard.log" 2>/dev/null | tail -1 || true)
+  printf " [${GREEN}OK${NC}] Cloudflare Tunnel: Ativo -> %s\n" "$url"
+elif [ "$TUN_RES" -eq 2 ]; then
+  printf " [${YELLOW}AVISO${NC}] Cloudflare Tunnel: Processo ativo, aguardando URL pública\n"
+else
+  printf " [${YELLOW}AVISO${NC}] Cloudflare Tunnel: Não ativo\n"
+fi
+
+printf "${CYAN}----------------------------------------------------${NC}\n"
+if [ "$ALL_OK" -eq 1 ]; then
+  printf "${GREEN}STATUS GERAL: SAUDÁVEL — Todos os serviços locais operando normalmente.${NC}\n"
+  exit 0
+else
+  printf "${RED}STATUS GERAL: DEGRADADO / FALHA — Intervenção necessária ou recuperação pendente.${NC}\n"
+  exit 1
+fi

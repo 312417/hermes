@@ -1,0 +1,35 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# hermes-backup — Automated local backups with retention management
+set -u
+
+HOME="${HOME:-/data/data/com.termux/files/home}"
+BACKUP_DIR="$HOME/hermes-backups"
+OPS_DIR="$HOME/.hermes-ops"
+LOG_FILE="$OPS_DIR/logs/backup.log"
+
+mkdir -p "$BACKUP_DIR" "$OPS_DIR/logs"
+chmod 700 "$BACKUP_DIR"
+
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+LOG_TS=$(date -Iseconds 2>/dev/null || date)
+TARGET_FILE="$BACKUP_DIR/hermes-backup-$TIMESTAMP.zip"
+PROOT_ROOT="/data/data/com.termux/files/usr/var/lib/proot-distro/containers/ubuntu/rootfs"
+
+echo "[$LOG_TS] Iniciando backup local do Hermes em $TARGET_FILE..." >> "$LOG_FILE"
+
+out=$(env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD bash -lc "hermes backup -o /root/bkp-$TIMESTAMP.zip" 2>&1 || true)
+
+if [ -f "$PROOT_ROOT/root/bkp-$TIMESTAMP.zip" ]; then
+  mv "$PROOT_ROOT/root/bkp-$TIMESTAMP.zip" "$TARGET_FILE"
+  chmod 600 "$TARGET_FILE"
+  echo "[$LOG_TS] Backup gerado com sucesso: $TARGET_FILE ($(du -h "$TARGET_FILE" | cut -f1))" >> "$LOG_FILE"
+  echo "Backup concluído: $TARGET_FILE ($(du -h "$TARGET_FILE" | cut -f1))"
+else
+  echo "[$LOG_TS] Erro ao gerar backup: $out" >> "$LOG_FILE"
+  echo "Erro ao gerar backup: $out"
+fi
+
+# Retention policy: keep newest 7 backups; purge older
+ls -t "$BACKUP_DIR"/hermes-backup-*.zip 2>/dev/null | tail -n +8 | xargs rm -f 2>/dev/null || true
+
+echo "[$LOG_TS] Retenção aplicada (máx 7 backups mantidos)." >> "$LOG_FILE"

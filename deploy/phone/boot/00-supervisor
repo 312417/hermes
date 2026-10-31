@@ -1,0 +1,34 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# 00-supervisor — Boot script for Termux:Boot on Samsung Galaxy S20 FE
+# Supervises runit daemon (service-daemon) with wake-lock and auto-resurrection.
+
+termux-wake-lock
+unset LD_PRELOAD
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+HOME="${HOME:-/data/data/com.termux/files/home}"
+export SVDIR="${SVDIR:-$PREFIX/var/service}"
+export LOGDIR="${LOGDIR:-$PREFIX/var/log}"
+LOG_FILE="$HOME/supervisor-boot.log"
+
+echo "[$(date -Iseconds)] [BOOT] Termux:Boot inicializado no S20 FE." >> "$LOG_FILE"
+
+# Start sshd if not running
+pgrep -x sshd >/dev/null 2>&1 || sshd
+
+# Sync environment secrets to PRoot container if present
+if [ -f "$HOME/.hermes/.env" ]; then
+  env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD bash -c '
+    mkdir -p /root/.hermes
+    cp /data/data/com.termux/files/home/.hermes/.env /root/.hermes/.env
+    chmod 600 /root/.hermes/.env
+  '
+fi
+
+# Outer resilience loop: keeps runsvdir alive indefinitely
+while true; do
+  if ! pgrep -f "runsvdir.*service" >/dev/null 2>&1; then
+    echo "[$(date -Iseconds)] [BOOT] Iniciando service-daemon (runit)..." >> "$LOG_FILE"
+    service-daemon start >> "$LOG_FILE" 2>&1 || true
+  fi
+  sleep 15
+done

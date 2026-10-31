@@ -1,0 +1,3 @@
+#!/data/data/com.termux/files/usr/bin/sh
+export LOGDIR="${LOGDIR:-/data/data/com.termux/files/usr/var/log}"
+exec svlogger

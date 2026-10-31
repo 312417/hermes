@@ -1,0 +1,174 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# hermes-recover — Local idempotent recovery engine with flock & backoff
+set -u
+
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+HOME="${HOME:-/data/data/com.termux/files/home}"
+OPS_DIR="$HOME/.hermes-ops"
+STATE_DIR="$OPS_DIR/state"
+LOG_DIR="$OPS_DIR/logs"
+LOCK_FILE="$STATE_DIR/recover.lock"
+EVENTS_LOG="$LOG_DIR/events.log"
+RESTARTS_FILE="$STATE_DIR/restarts.log"
+
+mkdir -p "$STATE_DIR" "$LOG_DIR"
+
+# Protect against concurrent runs with non-blocking flock
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
+  echo "[$(date -Iseconds)] [RECOVER] Já existe outra instância de recuperação em andamento. Abortando."
+  exit 0
+fi
+
+log_event() {
+  # Format: ISO-timestamp | component | check | reason | action | result | duration
+  _comp="${1:-general}"
+  _check="${2:-health}"
+  _reason="${3:-unknown}"
+  _action="${4:-none}"
+  _result="${5:-ok}"
+  _dur="${6:-0s}"
+  _ts=$(date -Iseconds 2>/dev/null || date)
+  printf "%s | %-15s | %-12s | %-20s | %-18s | %-10s | %s\n" \
+    "$_ts" "$_comp" "$_check" "$_reason" "$_action" "$_result" "$_dur" >> "$EVENTS_LOG"
+  echo "[$_ts] [$_comp] $_reason -> $_action ($_result)"
+}
+
+# Thermal check (Samsung S20 FE temperature in millidegrees, e.g. 42000 = 42C)
+check_thermal() {
+  if [ -r /sys/class/power_supply/battery/temp ]; then
+    raw_temp=$(cat /sys/class/power_supply/battery/temp 2>/dev/null || echo "0")
+    # If temp > 45000 (45C) or > 450 depending on driver
+    if [ "$raw_temp" -gt 45000 ] || { [ "$raw_temp" -gt 450 ] && [ "$raw_temp" -lt 1000 ]; }; then
+      log_event "battery" "thermal" "HIGH_TEMP_${raw_temp}" "throttle_restart" "delayed" "0s"
+      return 1
+    fi
+  fi
+  return 0
+}
+
+# Rate limit / backoff checker: max 5 restarts per 30 minutes (1800s)
+check_backoff() {
+  _service="$1"
+  _now=$(date +%s)
+  _window=1800
+  _max_attempts=5
+
+  # Purge older entries
+  if [ -f "$RESTARTS_FILE" ]; then
+    _tmp=$(mktemp)
+    awk -v now="$_now" -v win="$_window" '$1 >= (now - win)' "$RESTARTS_FILE" > "$_tmp" 2>/dev/null || true
+    mv "$_tmp" "$RESTARTS_FILE"
+  else
+    touch "$RESTARTS_FILE"
+  fi
+
+  _count=$(grep -c " $_service$" "$RESTARTS_FILE" 2>/dev/null || echo "0")
+  if [ "$_count" -ge "$_max_attempts" ]; then
+    log_event "$_service" "backoff" "RATE_LIMIT_EXCEEDED" "enter_degraded_mode" "postponed" "0s"
+    return 1 # In degraded mode: delay restart
+  fi
+  return 0
+}
+
+record_restart() {
+  _service="$1"
+  _now=$(date +%s)
+  echo "$_now $_service" >> "$RESTARTS_FILE"
+}
+
+controlled_restart() {
+  _service="$1"
+  _reason="$2"
+  _t0=$(date +%s)
+
+  if ! check_backoff "$_service"; then
+    echo "[$(date -Iseconds)] [$_service] Modo degradado ativo. Reinício adiado para evitar aquecimento."
+    return 1
+  fi
+
+  check_thermal || sleep 10
+
+  echo "[$(date -Iseconds)] [$_service] Iniciando reinício controlado (motivo: $_reason)..."
+
+  # If runit service directory exists, use sv
+  if [ -d "$PREFIX/var/service/$_service" ]; then
+    # Gentle stop with SIGTERM, wait up to 10s
+    sv -w 10 stop "$_service" >/dev/null 2>&1 || true
+    # If still not stopped, sv force-stop
+    sv -w 5 force-stop "$_service" >/dev/null 2>&1 || true
+    sleep 2
+    # Start service
+    sv start "$_service" >/dev/null 2>&1 || sv up "$_service" >/dev/null 2>&1 || true
+  fi
+
+  record_restart "$_service"
+  _t1=$(date +%s)
+  _dur="$((_t1 - _t0))s"
+  log_event "$_service" "restart" "$_reason" "controlled_restart" "success" "$_dur"
+}
+
+# Run diagnostics via hermes-health JSON mode
+HEALTH_JSON=$("$OPS_DIR/bin/hermes-health" --json 2>/dev/null || echo '{"healthy":0}')
+
+NET_OK=$(echo "$HEALTH_JSON" | grep -o '"internet":[0-9]*' | cut -d: -f2 || echo "0")
+PROOT_OK=$(echo "$HEALTH_JSON" | grep -o '"proot":[0-9]*' | cut -d: -f2 || echo "0")
+OCX_OK=$(echo "$HEALTH_JSON" | grep -o '"opencodex":[0-9]*' | cut -d: -f2 || echo "0")
+GW_PROC=$(echo "$HEALTH_JSON" | grep -o '"gateway_proc":[0-9]*' | cut -d: -f2 || echo "0")
+GW_RESP=$(echo "$HEALTH_JSON" | grep -o '"gateway_resp":[0-9]*' | cut -d: -f2 || echo "0")
+DASH_OK=$(echo "$HEALTH_JSON" | grep -o '"dashboard":[0-9]*' | cut -d: -f2 || echo "0")
+TUN_OK=$(echo "$HEALTH_JSON" | grep -o '"tunnel":[0-9]*' | cut -d: -f2 || echo "0")
+IS_HEALTHY=$(echo "$HEALTH_JSON" | grep -o '"healthy":[0-9]*' | cut -d: -f2 || echo "0")
+
+if [ "$IS_HEALTHY" = "1" ]; then
+  # Everything is healthy; no recovery needed
+  exit 0
+fi
+
+# 1. Internet outage check
+if [ "$NET_OK" = "0" ]; then
+  if [ "$PROOT_OK" = "1" ] && [ "$OCX_OK" = "1" ] && [ "$GW_PROC" = "0" ]; then
+    log_event "network" "connectivity" "EXTERNAL_INTERNET_OUTAGE" "preserve_local_state" "waiting" "0s"
+    # Do not restart local services when only external WAN is down!
+    exit 0
+  fi
+fi
+
+# 2. PRoot hung check
+if [ "$PROOT_OK" = "0" ]; then
+  log_event "proot" "responsiveness" "PROOT_COMMAND_TIMEOUT" "kill_hung_proot" "recovering" "0s"
+  # Kill hung ptrace helpers if any deadlocked
+  pkill -9 -f "proot.*ubuntu" 2>/dev/null || true
+  sleep 3
+fi
+
+# 3. OpenCodex check (Dependency for Gateway)
+if [ "$OCX_OK" = "0" ]; then
+  controlled_restart "opencodex" "HEALTHZ_FAILED"
+  # Wait up to 10s for OpenCodex before restarting Gateway
+  for i in $(seq 1 10); do
+    if curl -s -m 2 http://127.0.0.1:10100/healthz >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+fi
+
+# 4. Gateway check
+if [ "$GW_PROC" != "0" ]; then
+  controlled_restart "hermes-gateway" "PROCESS_MISSING_OR_ZOMBIE"
+elif [ "$GW_RESP" != "1" ]; then
+  controlled_restart "hermes-gateway" "STATUS_SOCKET_TIMEOUT"
+fi
+
+# 5. Dashboard check
+if [ "$DASH_OK" = "0" ]; then
+  controlled_restart "hermes-dashboard" "HTTP_PORT_9119_UNRESPONSIVE"
+fi
+
+# 6. Cloudflare Tunnel check
+if [ "$TUN_OK" != "0" ]; then
+  controlled_restart "dashboard-tunnel" "TUNNEL_MISSING_OR_NO_URL"
+fi
+
+exit 0

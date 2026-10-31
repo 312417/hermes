@@ -1,0 +1,5 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# opencodex service run script
+exec 2>&1
+echo "[$(date -Iseconds)] Iniciando OpenCodex local no S20 FE..."
+exec env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD node /usr/local/bin/ocx start
