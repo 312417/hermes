@@ -185,11 +185,10 @@ curator:
 timezone: "America/Sao_Paulo"
 
 mcp_servers:
-  newsapi:
-    command: "npx"
-    args: ["-y", "mcp-newsapi"]
-    env:
-      NEWSAPI_API_KEY: "${NEWSAPI_API_KEY}"
-  playwright:
-    command: "npx"
-    args: ["-y", "@playwright/mcp@latest", "--browser", "chromium"]
+  # newsapi:
+  #   command: "npx"
+  #   args: ["-y", "mcp-newsapi"]
+  #   env:
+  #     NEWSAPI_API_KEY: "${NEWSAPI_API_KEY}"
+  # playwright disabled on mobile PRoot to prevent libuv futex crashes
+
