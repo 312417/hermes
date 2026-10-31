@@ -24,10 +24,13 @@
 
 ## Modelos e Especialização
 
-- **Modelo Principal:** Luna (`gpt-6-luna` via OpenCodex na porta 10100).
-- **Modelo Secundário / Fallback:** Gemini 3.8 (`google-antigravity/gemini-3.8-flash` ou `gemini-3.8-flash`).
-- **Codificação / Programação:** Utilizar a CLI do Antigravity (`agy`) com o modelo Gemini 3.8.
-- **Tarefas Complexas e Arquitetura:** Utilizar o Sonnet (`claude-sonnet-4-6` / `claude-sonnet-5`).
+- **Modelo Padrão do Hermes (Conversa e Tarefas Gerais):** Gemini 3.8 (`google/gemini-3.8-flash` via OpenRouter).
+- **Engenharia de Software e Codificação (via Antigravity CLI / `agy`):**
+  - **Planejamento e Tarefas Difíceis:** Sonnet (`claude-sonnet-4-6` / `claude-sonnet-5` / `anthropic/claude-sonnet-5.5`).
+  - **Implementação:** Gemini 3.8.
+  - **Code Review:** Gemini 3.8.
+  - **Testes (Playwright, unitários, validação):** Gemini 3.8.
+- **Fallbacks:** Gemini 3.7 Flash, Sonnet 5.5, Luna (OpenCodex).
 
 ## Comportamento de conversa
 

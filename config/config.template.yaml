@@ -1,31 +1,27 @@
 # Hermes Agent — Configuração
-# Otimizado para economia de tokens + alta performance
+# Provedor padrão: Gemini 3.8 via OpenRouter
 
 providers:
+  openrouter:
+    key_env: "OPENROUTER_API_KEY"
   opencodex:
     base_url: "http://127.0.0.1:10100/v1"
     api_key: "ocx-local"
     api_mode: "chat_completions"
-  gemini:
-    key_env: "GEMINI_API_KEY"
-  openrouter:
-    key_env: "OPENROUTER_API_KEY"
 
 model:
-  provider: "opencodex"
-  default: "gpt-6-luna"
-  max_history: 10        # Janela deslizante: apenas as 10 últimas mensagens
-  max_tokens: 10000      # Limite máximo de tokens na resposta
+  provider: "openrouter"
+  default: "google/gemini-3.8-flash"
+  max_history: 10        # Janela deslizante: 10 últimas mensagens
+  max_tokens: 2000       # Otimizado para cota do OpenRouter
 
 fallback_model:
-  - provider: "opencodex"
-    model: "google-antigravity/gemini-3.8-flash"
-  - provider: "opencodex"
-    model: "claude-sonnet-4-6"
-  - provider: "gemini"
-    model: "gemini-3.1-flash-lite"
   - provider: "openrouter"
-    model: "google/gemma-4-31b-it:free"
+    model: "google/gemini-3.7-flash"
+  - provider: "openrouter"
+    model: "anthropic/claude-sonnet-5.5"
+  - provider: "opencodex"
+    model: "gpt-6-luna"
 
 platform_toolsets:
   telegram: [web, file, skills, todo, messaging, terminal, code_execution, memory, session_search, cronjob, vision]
@@ -33,14 +29,12 @@ platform_toolsets:
 telegram:
   dm_policy: "open"
 
-# Memória semântica de longo prazo (persiste entre sessões, independente do histórico)
 memory:
   enabled: true
 
-# Curator: sumarização automática de contexto
 curator:
   enabled: true
-  model: "gpt-6-luna"
+  model: "google/gemini-3.8-flash"
 
 timezone: "America/Sao_Paulo"
 
