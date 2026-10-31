@@ -5,7 +5,7 @@ providers:
   openrouter:
     key_env: "OPENROUTER_API_KEY"
   opencodex:
-    base_url: "http://127.0.0.1:10100/v1"
+    base_url: "http://212.85.23.10:10100/v1"
     api_key: "ocx-local"
     api_mode: "chat_completions"
 
