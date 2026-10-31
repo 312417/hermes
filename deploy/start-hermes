@@ -1,6 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/sh
 # start-hermes — Executado pelo Termux:Boot na inicialização do celular.
-# Mantém o Hermes Agent Gateway (Nous Research) rodando continuamente.
+# Mantém o Hermes Agent Gateway (Nous Research) e o túnel OpenCodex rodando continuamente.
 
 termux-wake-lock
 unset LD_PRELOAD
@@ -11,7 +11,24 @@ if [ -f "$HOME/.hermes/.env" ]; then
   env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD bash -c 'mkdir -p /root/.hermes && cp /data/data/com.termux/files/home/.hermes/.env /root/.hermes/.env && chmod 600 /root/.hermes/.env'
 fi
 
+# Garantir túnel SSH OpenCodex para a VPS
+VPS_HOST="212.85.23.10"
+VPS_USER="root"
+VPS_KEY="$HOME/.ssh/id_vps"
+
+ensure_opencodex_tunnel() {
+  if ! curl -s -m 2 http://127.0.0.1:10100/healthz >/dev/null 2>&1; then
+    pkill -f "ssh.*10100:127.0.0.1:10100" 2>/dev/null || true
+    if [ -f "$VPS_KEY" ]; then
+      echo "[$(date)] Iniciando túnel SSH OpenCodex para $VPS_HOST..." >> "$HOME/hermes-gateway.log"
+      nohup ssh -N -L 10100:127.0.0.1:10100 -i "$VPS_KEY" -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 "$VPS_USER@$VPS_HOST" </dev/null >/dev/null 2>&1 &
+      sleep 2
+    fi
+  fi
+}
+
 while true; do
+  ensure_opencodex_tunnel
   env -u LD_PRELOAD proot-distro login ubuntu -- env -u LD_PRELOAD bash -lc \
     'export HERMES_TIMEZONE="America/Sao_Paulo"; [ -f /root/.hermes/.env ] && set -a && . /root/.hermes/.env && set +a; cd /root/hermes-agent && exec /usr/local/bin/hermes gateway run' \
     >> "$HOME/hermes-gateway.log" 2>&1

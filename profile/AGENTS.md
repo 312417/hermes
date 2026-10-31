@@ -22,11 +22,12 @@
 | Escrita de arquivos | ❌ bloqueado | liberar em fase posterior |
 
 
-## Modelo padrão
+## Modelos e Especialização
 
-- Provedor: Groq (compatibilidade OpenAI)
-- Troca a qualquer momento via `hermes model`
-- Modelos configurados no `~/.hermes/.env` no celular
+- **Modelo Principal:** Luna (`gpt-6-luna` via OpenCodex na porta 10100).
+- **Modelo Secundário / Fallback:** Gemini 3.8 (`google-antigravity/gemini-3.8-flash` ou `gemini-3.8-flash`).
+- **Codificação / Programação:** Utilizar a CLI do Antigravity (`agy`) com o modelo Gemini 3.8.
+- **Tarefas Complexas e Arquitetura:** Utilizar o Sonnet (`claude-sonnet-4-6` / `claude-sonnet-5`).
 
 ## Comportamento de conversa
 

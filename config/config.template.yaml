@@ -2,24 +2,30 @@
 # Otimizado para economia de tokens + alta performance
 
 providers:
+  opencodex:
+    base_url: "http://127.0.0.1:10100/v1"
+    api_key: "ocx-local"
+    api_mode: "chat_completions"
   gemini:
     key_env: "GEMINI_API_KEY"
   openrouter:
     key_env: "OPENROUTER_API_KEY"
 
 model:
-  provider: "gemini"
-  default: "gemini-3.7-flash"
+  provider: "opencodex"
+  default: "gpt-6-luna"
   max_history: 10        # Janela deslizante: apenas as 10 últimas mensagens
   max_tokens: 10000      # Limite máximo de tokens na resposta
 
 fallback_model:
+  - provider: "opencodex"
+    model: "google-antigravity/gemini-3.8-flash"
+  - provider: "opencodex"
+    model: "claude-sonnet-4-6"
   - provider: "gemini"
     model: "gemini-3.1-flash-lite"
   - provider: "openrouter"
     model: "google/gemma-4-31b-it:free"
-  - provider: "opencode-free"
-    model: "deepseek-v4-flash-free"
 
 platform_toolsets:
   telegram: [web, file, skills, todo, messaging, terminal, code_execution, memory, session_search, cronjob, vision]
@@ -32,12 +38,9 @@ memory:
   enabled: true
 
 # Curator: sumarização automática de contexto
-# Comprime turns antigos em um resumo conciso ao atingir o limite do histórico.
-# Descarta mensagens de erro e irrelevantes, preserva decisões e fatos importantes.
 curator:
   enabled: true
-  # Modelo leve para sumarização (economiza tokens do modelo principal)
-  model: "gemini-3.1-flash-lite"
+  model: "gpt-6-luna"
 
 timezone: "America/Sao_Paulo"
 
@@ -50,4 +53,3 @@ mcp_servers:
   playwright:
     command: "npx"
     args: ["-y", "@playwright/mcp@latest", "--browser", "chromium"]
-
